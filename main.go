@@ -48,7 +48,6 @@ func main() {
 		Name:      "coreclaw-request",
 		Input:     prompt,
 		Timestamp: new(time.Now()),
-		//ID:        uuid.New().String(),
 	})
 
 	if err != nil {
