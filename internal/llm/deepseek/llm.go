@@ -92,6 +92,11 @@ func (d DeepSeek) Ask(prompt string, id string) (string, error) {
 	var answer string
 	defer func() {
 		g.Output = model.M{"completion": answer}
+		g.Usage = model.Usage{
+			Input:  int(d.EstimateTokens(prompt)),
+			Output: int(d.EstimateTokens(answer)),
+			Total:  int(d.EstimateTokens(answer + prompt + d.systemPrompt)),
+		}
 		_, gErr := d.langFuse.GenerationEnd(g)
 		if gErr != nil {
 			d.logger.Error().Err(gErr).Msg("Failed to generation_end")
@@ -130,4 +135,8 @@ func (d DeepSeek) Ask(prompt string, id string) (string, error) {
 
 func (d DeepSeek) Model() string {
 	return d.model
+}
+
+func (d DeepSeek) EstimateTokens(input string) float64 {
+	return float64(len([]rune(input))) * 0.3
 }
