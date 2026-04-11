@@ -20,6 +20,13 @@ Most modern AI agents do not control context properly.
 - Results are hard to reproduce
 - Token usage and cost become unpredictable
 
+Large context is not only a cost problem.
+
+- More context does NOT mean better answers
+- Noise reduces answer quality
+- Important signals get diluted
+- Model focus degrades as context grows
+
 The result is a black box system:
 it produces output, but you cannot understand or control it.
 
@@ -31,6 +38,7 @@ coreClaw is built around explicit context management.
 
 - You decide what goes into the prompt
 - Context is structured and bounded
+- Noise is minimized
 - Every request is traceable
 - Model behavior becomes predictable
 
