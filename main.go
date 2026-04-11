@@ -42,7 +42,7 @@ func main() {
 		ApiKey:   cfg.LLM.ApiKey,
 		LangFuse: l,
 		Logger:   &logger,
-	}, "ты AI-ассистент хомяк")
+	}, "отвечай кратко и по делу")
 
 	t, err := l.Trace(&model.Trace{
 		Name:      "coreclaw-request",

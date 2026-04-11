@@ -73,7 +73,7 @@ func (d DeepSeek) Ask(prompt string, id string) (string, error) {
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 3 * time.Minute,
 	}
 
 	g, err := d.langFuse.Generation(&model.Generation{
