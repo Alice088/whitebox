@@ -59,10 +59,13 @@ func main() {
 		logger.Fatal().Err(err).Msg("Failed to ask LLM")
 	}
 
-	_, _ = l.Trace(&model.Trace{
+	_, err = l.Trace(&model.Trace{
 		ID:     t.ID,
 		Output: answer,
 	})
+	if err != nil {
+		logger.Fatal().Err(err).Send()
+	}
 
 	l.Flush(context.TODO())
 	fmt.Printf("> %s\n", answer)
