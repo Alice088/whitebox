@@ -8,41 +8,54 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/henomis/langfuse-go"
+	"github.com/henomis/langfuse-go/model"
+	"github.com/rs/zerolog"
 )
 
 type DeepSeek struct {
-	baseURL string
-	apiKey  string
-	model   string
+	baseURL      string
+	apiKey       string
+	model        string
+	systemPrompt string
+	langFuse     *langfuse.Langfuse
+	logger       *zerolog.Logger
 }
 
 type Opts struct {
-	ApiKey  string
-	BaseURL string
-	Model   string
+	ApiKey   string
+	BaseURL  string
+	Model    string
+	LangFuse *langfuse.Langfuse
+	Logger   *zerolog.Logger
 }
 
-func New(opts Opts) llm.LLM {
+func New(opts Opts, systemPrompt string) llm.LLM {
 	url := "https://api.deepseek.com"
 	if len(opts.BaseURL) != 0 {
 		url = opts.BaseURL
 	}
 
 	return DeepSeek{
-		baseURL: url,
-		apiKey:  opts.ApiKey,
-		model:   opts.Model,
+		baseURL:      url,
+		apiKey:       opts.ApiKey,
+		model:        opts.Model,
+		langFuse:     opts.LangFuse,
+		systemPrompt: systemPrompt,
+		logger:       opts.Logger,
 	}
 }
 
-func (d DeepSeek) Ask(s string) (string, error) {
+func (d DeepSeek) Ask(prompt string, id string) (string, error) {
+
 	url := d.baseURL + "/v1/chat/completions"
 
 	reqBody := llm.RequestBody{
 		Model: d.model,
 		Messages: []llm.Message{
-			{Role: "system", Content: "You are a helpful coding assistant"},
-			{Role: "user", Content: s},
+			{Role: "system", Content: d.systemPrompt},
+			{Role: "user", Content: prompt},
 		},
 	}
 
@@ -62,6 +75,29 @@ func (d DeepSeek) Ask(s string) (string, error) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
+
+	g, err := d.langFuse.Generation(&model.Generation{
+		Model:   d.model,
+		Name:    "llm-call",
+		TraceID: id,
+		Input: []model.M{
+			{"role": "system", "content": d.systemPrompt},
+			{"role": "user", "content": prompt},
+		},
+	}, nil)
+	if err != nil {
+		return "", err
+	}
+
+	var answer string
+	defer func() {
+		g.Output = model.M{"completion": answer}
+		_, gErr := d.langFuse.GenerationEnd(g)
+		if gErr != nil {
+			d.logger.Error().Err(gErr).Msg("Failed to generation_end")
+		}
+	}()
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -85,7 +121,8 @@ func (d DeepSeek) Ask(s string) (string, error) {
 	}
 
 	if len(response.Choices) > 0 {
-		return response.Choices[0].Message.Content, nil
+		answer = response.Choices[0].Message.Content
+		return answer, nil
 	}
 
 	return "", fmt.Errorf("no answer")

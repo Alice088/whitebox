@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"coreclaw/internal/config"
 	"coreclaw/internal/llm/deepseek"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/henomis/langfuse-go"
+	"github.com/henomis/langfuse-go/model"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 )
@@ -25,6 +29,8 @@ func main() {
 		logger.Fatal().Err(err).Send()
 	}
 
+	l := langfuse.New(context.Background())
+
 	var cfg config.Config
 	err = env.Parse(&cfg)
 	if err != nil {
@@ -32,13 +38,33 @@ func main() {
 	}
 
 	llm := deepseek.New(deepseek.Opts{
-		Model:  "deepseek-reasoner",
-		ApiKey: cfg.LLM.ApiKey,
+		Model:    "deepseek-reasoner",
+		ApiKey:   cfg.LLM.ApiKey,
+		LangFuse: l,
+		Logger:   &logger,
+	}, "ты AI-ассистент хомяк")
+
+	t, err := l.Trace(&model.Trace{
+		Name:      "coreclaw-request",
+		Input:     prompt,
+		Timestamp: new(time.Now()),
+		//ID:        uuid.New().String(),
 	})
-	answer, err := llm.Ask(prompt)
+
+	if err != nil {
+		logger.Fatal().Err(err).Send()
+	}
+
+	answer, err := llm.Ask(prompt, t.ID)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Failed to ask LLM")
 	}
 
+	_, _ = l.Trace(&model.Trace{
+		ID:     t.ID,
+		Output: answer,
+	})
+
+	l.Flush(context.TODO())
 	fmt.Printf("> %s\n", answer)
 }

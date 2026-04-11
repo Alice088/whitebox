@@ -1,6 +1,6 @@
 package llm
 
 type LLM interface {
-	Ask(string) (string, error)
+	Ask(prompt string, id string) (string, error)
 	Model() string
 }
