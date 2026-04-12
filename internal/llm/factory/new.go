@@ -1,10 +1,10 @@
 package factory
 
 import (
-	"coreclaw/internal/llm"
-	"coreclaw/internal/llm/deepseek"
-	"coreclaw/internal/llm/llamacpp"
 	"errors"
+	"whitebox/internal/llm"
+	"whitebox/internal/llm/deepseek"
+	"whitebox/internal/llm/llamacpp"
 )
 
 type Provider string

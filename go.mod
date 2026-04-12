@@ -1,4 +1,4 @@
-module coreclaw
+module whitebox
 
 go 1.26
 

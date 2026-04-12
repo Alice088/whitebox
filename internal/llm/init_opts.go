@@ -1,7 +1,7 @@
 package llm
 
 import (
-	"coreclaw/internal/context"
+	"whitebox/internal/context"
 
 	"github.com/henomis/langfuse-go"
 	"github.com/rs/zerolog"

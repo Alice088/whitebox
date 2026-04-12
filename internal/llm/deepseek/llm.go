@@ -2,13 +2,13 @@ package deepseek
 
 import (
 	"bytes"
-	"coreclaw/internal/context"
-	"coreclaw/internal/llm"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
+	"whitebox/internal/context"
+	"whitebox/internal/llm"
 
 	"github.com/henomis/langfuse-go"
 	"github.com/henomis/langfuse-go/model"

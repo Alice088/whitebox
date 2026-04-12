@@ -2,14 +2,14 @@ package main
 
 import (
 	"context"
-	"coreclaw/internal/config"
-	xcontext "coreclaw/internal/context"
-	"coreclaw/internal/flag"
-	xllm "coreclaw/internal/llm"
-	"coreclaw/internal/llm/factory"
 	"fmt"
 	"os"
 	"time"
+	"whitebox/internal/config"
+	xcontext "whitebox/internal/context"
+	"whitebox/internal/flag"
+	xllm "whitebox/internal/llm"
+	"whitebox/internal/llm/factory"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/henomis/langfuse-go"
