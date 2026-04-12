@@ -47,7 +47,7 @@ func RegisterLocal(name string, constructor Constructor) {
 	registerProvider(localProviders, name, constructor)
 }
 
-func New(providerOpts ProviderOpts, initOpts providers.InitOpts) (llm2.LLM, error) {
+func LLM(providerOpts ProviderOpts, initOpts providers.InitOpts) (llm2.LLM, error) {
 	providerName := normalizeProviderName(providerOpts)
 	constructor, err := resolveConstructor(providerOpts.ProviderType, providerName)
 	if err != nil {
