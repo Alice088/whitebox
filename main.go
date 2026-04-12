@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	cfg "whitebox/internal/config"
 	syscontext "whitebox/internal/context"
 	"whitebox/internal/factory"
@@ -15,11 +14,20 @@ import (
 	"github.com/henomis/langfuse-go"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	logger := zerolog.New(os.Stdout)
+	logRotator := &lumberjack.Logger{
+		Filename:   "./logs/whitebox.log",
+		MaxSize:    10,
+		MaxBackups: 2,
+		MaxAge:     28,
+		Compress:   true,
+	}
+
+	logger := zerolog.New(logRotator).With().Timestamp().Logger()
 
 	input, err := flag.ParseFlags()
 	if err != nil {
