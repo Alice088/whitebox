@@ -3,6 +3,7 @@ package flag
 import (
 	"errors"
 	"flag"
+	"strings"
 	"whitebox/internal/llm/factory"
 )
 
@@ -16,7 +17,7 @@ func ParseFlags() (Config, error) {
 	msg := flag.String("msg", "", "message to llm")
 	model := flag.String("model", "", "model name")
 	provider := flag.String("provider", "local", "provider: api | local")
-	providerName := flag.String("provider_name", "", "provider name like: deepseek, openai")
+	providerName := flag.String("provider_name", "", "provider name like: deepseek, llamacpp")
 
 	flag.Parse()
 
@@ -28,19 +29,21 @@ func ParseFlags() (Config, error) {
 		return Config{}, errors.New("msg is empty")
 	}
 
-	if *providerName == "" {
-		return Config{}, errors.New("provider_name required")
+	normalizedProvider := strings.TrimSpace(strings.ToLower(*provider))
+	if normalizedProvider != string(factory.APIProvider) && normalizedProvider != string(factory.LocalProvider) {
+		return Config{}, errors.New("provider must be 'api' or 'local'")
 	}
 
-	if *provider != "api" && *provider != "local" {
-		return Config{}, errors.New("provider must be 'api' or 'local'")
+	normalizedProviderName := strings.TrimSpace(strings.ToLower(*providerName))
+	if normalizedProvider == string(factory.APIProvider) && normalizedProviderName == "" {
+		return Config{}, errors.New("provider_name required for api provider")
 	}
 
 	return Config{
 		Model: *model,
 		Provider: factory.ProviderOpts{
-			ProviderType: factory.ToProvider(*provider),
-			Name:         *providerName,
+			ProviderType: factory.ToProvider(normalizedProvider),
+			Name:         normalizedProviderName,
 		},
 		Msg: *msg,
 	}, nil

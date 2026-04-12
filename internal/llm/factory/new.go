@@ -1,7 +1,9 @@
 package factory
 
 import (
-	"errors"
+	"fmt"
+	"strings"
+	"sync"
 	"whitebox/internal/llm"
 	"whitebox/internal/llm/deepseek"
 	"whitebox/internal/llm/llamacpp"
@@ -14,40 +16,97 @@ const (
 	LocalProvider Provider = "local"
 )
 
+const (
+	defaultLocalProvider = "llamacpp"
+)
+
 type ProviderOpts struct {
 	Name         string
 	ProviderType Provider
 }
 
+type Constructor func(initOpts llm.InitOpts) llm.LLM
+
+var (
+	mu             sync.RWMutex
+	apiProviders   = make(map[string]Constructor)
+	localProviders = make(map[string]Constructor)
+)
+
+func init() {
+	RegisterAPI("deepseek", deepseek.New)
+	RegisterLocal(defaultLocalProvider, llamacpp.New)
+}
+
+func RegisterAPI(name string, constructor Constructor) {
+	registerProvider(apiProviders, name, constructor)
+}
+
+func RegisterLocal(name string, constructor Constructor) {
+	registerProvider(localProviders, name, constructor)
+}
+
 func New(providerOpts ProviderOpts, initOpts llm.InitOpts) (llm.LLM, error) {
-	switch providerOpts.ProviderType {
+	providerName := normalizeProviderName(providerOpts)
+	constructor, err := resolveConstructor(providerOpts.ProviderType, providerName)
+	if err != nil {
+		return nil, err
+	}
+
+	return constructor(initOpts), nil
+}
+
+func resolveConstructor(providerType Provider, providerName string) (Constructor, error) {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	switch providerType {
 	case LocalProvider:
-		return newLocal(initOpts), nil
+		constructor, ok := localProviders[providerName]
+		if !ok {
+			return nil, fmt.Errorf("unknown local provider %q", providerName)
+		}
+		return constructor, nil
 	case APIProvider:
-		return newAPI(providerOpts, initOpts), nil
+		constructor, ok := apiProviders[providerName]
+		if !ok {
+			return nil, fmt.Errorf("unknown api provider %q", providerName)
+		}
+		return constructor, nil
 	default:
-		return nil, errors.New("unknow provider")
+		return nil, fmt.Errorf("unknown provider type %q", providerType)
 	}
 }
 
-func newLocal(opts llm.InitOpts) llm.LLM {
-	return llamacpp.New(opts)
+func registerProvider(target map[string]Constructor, name string, constructor Constructor) {
+	if constructor == nil {
+		panic("provider constructor is nil")
+	}
+
+	name = strings.TrimSpace(strings.ToLower(name))
+	if name == "" {
+		panic("provider name is empty")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	target[name] = constructor
 }
 
-func newAPI(providerOpts ProviderOpts, opts llm.InitOpts) llm.LLM {
-	switch providerOpts.Name {
-	case "deepseek":
-		return deepseek.New(opts)
-	default:
-		return deepseek.New(opts)
+func normalizeProviderName(opts ProviderOpts) string {
+	name := strings.TrimSpace(strings.ToLower(opts.Name))
+	if opts.ProviderType == LocalProvider && name == "" {
+		return defaultLocalProvider
 	}
+	return name
 }
 
 func ToProvider(provider string) Provider {
-	switch provider {
-	case "local":
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case string(LocalProvider):
 		return LocalProvider
-	case "API":
+	case string(APIProvider):
 		return APIProvider
 	default:
 		return APIProvider
