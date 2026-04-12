@@ -13,6 +13,7 @@ import (
 )
 
 type State struct {
+	Name         string
 	Input        string
 	SystemPrompt string
 	Output       string
@@ -28,16 +29,17 @@ type ReadStep func(ctx context.Context, s State) error
 type MutStep func(ctx context.Context, s *State) error
 
 type Runner struct {
-	read  []ReadStep
-	write []MutStep
+	R      map[string]ReadStep
+	W      map[string]MutStep
+	Logger *zerolog.Logger
 }
 
-func (r *Runner) Read(step ReadStep) {
-	r.read = append(r.read, step)
+func (r *Runner) Read(step ReadStep, name string) {
+	r.R[name] = step
 }
 
-func (r *Runner) Write(step MutStep) {
-	r.write = append(r.write, step)
+func (r *Runner) Write(step MutStep, name string) {
+	r.W[name] = step
 }
 
 func (r *Runner) Run(ctx context.Context, state *State) error {
@@ -45,13 +47,17 @@ func (r *Runner) Run(ctx context.Context, state *State) error {
 		return errors.New("state is nil")
 	}
 
-	for _, step := range r.read {
+	for name, step := range r.R {
+		r.Logger.Info().Str("step_mode", "read").Str("step_name", name).Msg("run step")
+
 		if err := step(ctx, *state); err != nil {
 			return err
 		}
 	}
 
-	for _, step := range r.write {
+	for name, step := range r.W {
+		r.Logger.Info().Str("step_mode", "write").Str("step_name", name).Msg("run step")
+
 		if err := step(ctx, state); err != nil {
 			return err
 		}
