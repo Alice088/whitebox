@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	//zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	logRotator := &lumberjack.Logger{
 		Filename:   "./logs/whitebox.log",
 		MaxSize:    10,
@@ -61,16 +61,23 @@ func main() {
 	lf := langfuse.New(context.Background())
 
 	runner := &pipeline.Runner{Logger: &logger}
-	runner.Use("langfuse_start", pipeline.LangfuseStart(lf, "whitebox-request"))
+	runner.Use("langfuse_start", pipeline.LangfuseStart(lf))
 	runner.Use("build_system_prompt", pipeline.BuildSystemPrompt())
+	runner.Use("langfuse_generation_start", pipeline.LangfuseGenerationStart(lf))
 	runner.Use("ask_llm", pipeline.AskLLM())
+	runner.Use("langfuse_generation_end", pipeline.LangfuseGenerationEnd(lf))
 	runner.Use("langfuse_end", pipeline.LangfuseEnd(lf))
+	runner.Use("langfuse_flush", pipeline.LangfuseFlush(lf))
 	runner.Use("logging", pipeline.Logging(logger))
 
 	state := &pipeline.State{
-		Input:   input.Msg,
-		LLM:     llm,
-		Context: systemContext,
+		IO: pipeline.IO{
+			Input: input.Msg,
+		},
+		Runtime: pipeline.Runtime{
+			LLM:     llm,
+			Context: systemContext,
+		},
 	}
 
 	err = runner.Run(context.Background(), state)
@@ -78,6 +85,5 @@ func main() {
 		logger.Fatal().Err(err).Msg("pipeline failed")
 	}
 
-	lf.Flush(context.Background())
-	fmt.Printf("> %s\n", state.Output)
+	fmt.Printf("> %s\n", state.IO.Output)
 }

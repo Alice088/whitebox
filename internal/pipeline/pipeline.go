@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"time"
-	syscontext "whitebox/internal/context"
-	llmcore "whitebox/internal/core/llm"
 
 	"github.com/henomis/langfuse-go"
 	"github.com/henomis/langfuse-go/model"
@@ -13,15 +11,9 @@ import (
 )
 
 type State struct {
-	Input        string
-	SystemPrompt string
-	Output       string
-
-	LLM     llmcore.LLM
-	Context syscontext.Context
-
-	TraceID string
-	Meta    map[string]any
+	IO            IO
+	Runtime       Runtime
+	Observability Observability
 }
 
 type Step func(ctx context.Context, s *State) error
@@ -60,23 +52,23 @@ func (r *Runner) Run(ctx context.Context, state *State) error {
 
 func BuildSystemPrompt() Step {
 	return func(_ context.Context, s *State) error {
-		s.SystemPrompt = s.Context.Prompt()
+		s.IO.SystemPrompt = s.Runtime.Context.Prompt()
 		return nil
 	}
 }
 
 func AskLLM() Step {
 	return func(_ context.Context, s *State) error {
-		if s.LLM == nil {
+		if s.Runtime.LLM == nil {
 			return errors.New("llm is nil")
 		}
 
-		output, err := s.LLM.Ask(s.Input, s.SystemPrompt)
+		output, err := s.Runtime.LLM.Ask(s.IO.Input, s.IO.SystemPrompt)
 		if err != nil {
 			return err
 		}
 
-		s.Output = output
+		s.IO.Output = output
 		return nil
 	}
 }
@@ -84,48 +76,100 @@ func AskLLM() Step {
 func Logging(logger zerolog.Logger) Step {
 	return func(_ context.Context, s *State) error {
 		logger.Info().
-			Str("input", s.Input).
-			Str("output", s.Output).
+			Str("input", s.IO.Input).
+			Str("output", s.IO.Output).
 			Msg("pipeline log")
 		return nil
 	}
 }
 
-func LangfuseStart(client *langfuse.Langfuse, name string) Step {
+func LangfuseFlush(client *langfuse.Langfuse) Step {
+	return func(ctx context.Context, s *State) error {
+		client.Flush(ctx)
+		return nil
+	}
+}
+
+func LangfuseStart(client *langfuse.Langfuse) Step {
 	return func(_ context.Context, s *State) error {
 		if client == nil {
 			return nil
 		}
 
-		now := time.Now()
-
 		trace, err := client.Trace(&model.Trace{
-			Name:      name,
-			Input:     s.Input,
-			Timestamp: &now,
+			Name:      "whitebox-request",
+			Input:     s.IO.Input,
+			Timestamp: new(time.Now()),
 		})
 		if err != nil {
 			return err
 		}
 
-		s.TraceID = trace.ID
+		s.Observability.TraceID = trace.ID
 		return nil
 	}
 }
 
 func LangfuseEnd(client *langfuse.Langfuse) Step {
 	return func(_ context.Context, s *State) error {
-		if client == nil || s.TraceID == "" {
+		if client == nil {
 			return nil
 		}
 
-		_, err := client.Trace(&model.Trace{
-			ID:     s.TraceID,
-			Output: s.Output,
+		trace, err := client.Trace(&model.Trace{
+			ID:     s.Observability.TraceID,
+			Output: s.IO.Output,
 		})
 		if err != nil {
 			return err
 		}
+
+		s.Observability.TraceID = trace.ID
+		return nil
+	}
+}
+
+func LangfuseGenerationEnd(client *langfuse.Langfuse) Step {
+	return func(_ context.Context, s *State) error {
+		if client == nil || s.Observability.TraceID == "" {
+			return nil
+		}
+
+		s.Observability.Generation.Output = model.M{"completion": s.IO.Output}
+		s.Observability.Generation.Usage = model.Usage{
+			Input:  int(s.Runtime.LLM.EstimateTokens(s.IO.Input)),
+			Output: int(s.Runtime.LLM.EstimateTokens(s.IO.Output)),
+			Total:  int(s.Runtime.LLM.EstimateTokens(s.IO.Output + s.IO.Input + s.IO.SystemPrompt)),
+		}
+		_, err := client.GenerationEnd(s.Observability.Generation)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+}
+
+func LangfuseGenerationStart(client *langfuse.Langfuse) Step {
+	return func(_ context.Context, s *State) error {
+		if client == nil || s.Observability.TraceID == "" {
+			return nil
+		}
+
+		g, err := client.Generation(&model.Generation{
+			Model:   s.Runtime.LLM.Model(),
+			Name:    "llm-call",
+			TraceID: s.Observability.TraceID,
+			Input: []model.M{
+				{"role": "system", "content": s.IO.SystemPrompt},
+				{"role": "user", "content": s.IO.Input},
+			},
+		}, nil)
+		if err != nil {
+			return err
+		}
+
+		s.Observability.Generation = g
 
 		return nil
 	}
