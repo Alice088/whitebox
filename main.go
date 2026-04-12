@@ -40,25 +40,21 @@ func main() {
 		logger.Fatal().Err(err).Send()
 	}
 
-	ctx := xcontext.Context{}
-	err = ctx.Collect(xcontext.CollectOpts{
+	systemContext := xcontext.Context{}
+	err = systemContext.Collect(xcontext.CollectOpts{
 		ToolsPath:  "./context/tools",
 		MindPath:   "./context/mind",
 		MemoryPath: "./context/memory",
 		//MessagesPath: "nope",
 		SkillsPath: "./context/skills",
 	})
-
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Failed to load context")
 	}
 
 	llm, err := factory.New(flags.Provider, xllm.InitOpts{
-		Model:    flags.Model,
-		ApiKey:   cfg.LLM.ApiKey,
-		LangFuse: l,
-		Logger:   &logger,
-		Context:  ctx,
+		Model:  flags.Model,
+		ApiKey: cfg.LLM.ApiKey,
 	})
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Failed to init LLM")
@@ -69,14 +65,38 @@ func main() {
 		Input:     flags.Msg,
 		Timestamp: new(time.Now()),
 	})
-
 	if err != nil {
 		logger.Fatal().Err(err).Send()
 	}
 
-	answer, err := llm.Ask(flags.Msg, t.ID)
+	systemPrompt := systemContext.Prompt()
+	g, err := l.Generation(&model.Generation{
+		Model:   llm.Model(),
+		Name:    "llm-call",
+		TraceID: t.ID,
+		Input: []model.M{
+			{"role": "system", "content": systemPrompt},
+			{"role": "user", "content": flags.Msg},
+		},
+	}, nil)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("Failed to create generation")
+	}
+
+	answer, err := llm.Ask(flags.Msg, systemPrompt)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Failed to ask LLM")
+	}
+
+	g.Output = model.M{"completion": answer}
+	g.Usage = model.Usage{
+		Input:  int(llm.EstimateTokens(flags.Msg)),
+		Output: int(llm.EstimateTokens(answer)),
+		Total:  int(llm.EstimateTokens(answer + flags.Msg + systemPrompt)),
+	}
+	_, err = l.GenerationEnd(g)
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to generation_end")
 	}
 
 	_, err = l.Trace(&model.Trace{

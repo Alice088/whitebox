@@ -7,23 +7,15 @@ import (
 	"io"
 	"net/http"
 	"time"
-	"whitebox/internal/context"
 	"whitebox/internal/core/llm"
 	http2 "whitebox/internal/http"
 	"whitebox/internal/providers"
-
-	"github.com/henomis/langfuse-go"
-	"github.com/henomis/langfuse-go/model"
-	"github.com/rs/zerolog"
 )
 
 type Model struct {
-	baseURL  string
-	apiKey   string
-	model    string
-	langFuse *langfuse.Langfuse
-	logger   *zerolog.Logger
-	context  context.Context
+	baseURL string
+	apiKey  string
+	model   string
 }
 
 func New(opts providers.InitOpts) llm.LLM {
@@ -33,22 +25,19 @@ func New(opts providers.InitOpts) llm.LLM {
 	}
 
 	return Model{
-		baseURL:  url,
-		apiKey:   opts.ApiKey,
-		model:    opts.Model,
-		langFuse: opts.LangFuse,
-		logger:   opts.Logger,
-		context:  opts.Context,
+		baseURL: url,
+		apiKey:  opts.ApiKey,
+		model:   opts.Model,
 	}
 }
 
-func (d Model) Ask(prompt string, id string) (string, error) {
+func (d Model) Ask(prompt string, systemPrompt string) (string, error) {
 	url := d.baseURL + "/v1/chat/completions"
 
 	reqBody := http2.RequestBody{
 		Model: d.model,
 		Messages: []http2.Message{
-			{Role: "system", Content: d.context.Prompt()},
+			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: prompt},
 		},
 	}
@@ -66,36 +55,7 @@ func (d Model) Ask(prompt string, id string) (string, error) {
 	req.Header.Set("Authorization", "Bearer "+d.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{
-		Timeout: 3 * time.Minute,
-	}
-
-	g, err := d.langFuse.Generation(&model.Generation{
-		Model:   d.model,
-		Name:    "llm-call",
-		TraceID: id,
-		Input: []model.M{
-			{"role": "system", "content": d.context.Prompt()},
-			{"role": "user", "content": prompt},
-		},
-	}, nil)
-	if err != nil {
-		return "", err
-	}
-
-	var answer string
-	defer func() {
-		g.Output = model.M{"completion": answer}
-		g.Usage = model.Usage{
-			Input:  int(d.EstimateTokens(prompt)),
-			Output: int(d.EstimateTokens(answer)),
-			Total:  int(d.EstimateTokens(answer + prompt + d.context.Prompt())),
-		}
-		_, gErr := d.langFuse.GenerationEnd(g)
-		if gErr != nil {
-			d.logger.Error().Err(gErr).Msg("Failed to generation_end")
-		}
-	}()
+	client := &http.Client{Timeout: 3 * time.Minute}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -116,12 +76,11 @@ func (d Model) Ask(prompt string, id string) (string, error) {
 	var response http2.ResponseBody
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	if len(response.Choices) > 0 {
-		answer = response.Choices[0].Message.Content
-		return answer, nil
+		return response.Choices[0].Message.Content, nil
 	}
 
 	return "", fmt.Errorf("no answer")
@@ -132,5 +91,5 @@ func (d Model) Model() string {
 }
 
 func (d Model) EstimateTokens(input string) float64 {
-	return float64(len([]rune(input))) * 1
+	return float64(len([]rune(input)))
 }
