@@ -24,16 +24,7 @@ type DeepSeek struct {
 	context  context.Context
 }
 
-type Opts struct {
-	ApiKey   string
-	BaseURL  string
-	Model    string
-	LangFuse *langfuse.Langfuse
-	Logger   *zerolog.Logger
-	Context  context.Context
-}
-
-func New(opts Opts) llm.LLM {
+func New(opts llm.InitOpts) llm.LLM {
 	url := "https://api.deepseek.com"
 	if len(opts.BaseURL) != 0 {
 		url = opts.BaseURL

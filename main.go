@@ -4,7 +4,9 @@ import (
 	"context"
 	"coreclaw/internal/config"
 	xcontext "coreclaw/internal/context"
-	"coreclaw/internal/llm/llamacpp"
+	"coreclaw/internal/flag"
+	xllm "coreclaw/internal/llm"
+	"coreclaw/internal/llm/factory"
 	"fmt"
 	"os"
 	"time"
@@ -17,15 +19,15 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		os.Exit(0)
-	}
-	prompt := os.Args[1]
-
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	logger := zerolog.New(os.Stdout)
 
-	err := godotenv.Load()
+	flags, err := flag.ParseFlags()
+	if err != nil {
+		logger.Fatal().Err(err).Send()
+	}
+
+	err = godotenv.Load()
 	if err != nil {
 		logger.Fatal().Err(err).Send()
 	}
@@ -51,17 +53,20 @@ func main() {
 		logger.Fatal().Err(err).Msg("Failed to load context")
 	}
 
-	llm := llamacpp.New(llamacpp.Opts{
-		Model: "Gemopus-4-E4B-it-Preview-Q6_K.gguf",
-		//ApiKey:   cfg.LLM.ApiKey,
+	llm, err := factory.New(flags.Provider, xllm.InitOpts{
+		Model:    flags.Model,
+		ApiKey:   cfg.LLM.ApiKey,
 		LangFuse: l,
 		Logger:   &logger,
 		Context:  ctx,
 	})
+	if err != nil {
+		logger.Fatal().Err(err).Msg("Failed to init LLM")
+	}
 
 	t, err := l.Trace(&model.Trace{
 		Name:      "coreclaw-request",
-		Input:     prompt,
+		Input:     flags.Msg,
 		Timestamp: new(time.Now()),
 	})
 
@@ -69,7 +74,7 @@ func main() {
 		logger.Fatal().Err(err).Send()
 	}
 
-	answer, err := llm.Ask(prompt, t.ID)
+	answer, err := llm.Ask(flags.Msg, t.ID)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Failed to ask LLM")
 	}
