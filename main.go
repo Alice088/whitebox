@@ -60,16 +60,12 @@ func main() {
 
 	lf := langfuse.New(context.Background())
 
-	runner := &pipeline.Runner{
-		R:      make(map[string]pipeline.ReadStep),
-		W:      make(map[string]pipeline.MutStep),
-		Logger: &logger,
-	}
-	runner.Write(pipeline.LangfuseStart(lf, "whitebox-request"), "langfuse_trace")
-	runner.Write(pipeline.BuildPrompt(), "build_prompt")
-	runner.Write(pipeline.AskLLM(), "llm_call")
-	runner.Write(pipeline.LangfuseEnd(lf), "langfuse_trace_end")
-	runner.Read(pipeline.Logging(logger), "logging")
+	runner := &pipeline.Runner{Logger: &logger}
+	runner.Use("langfuse_start", pipeline.LangfuseStart(lf, "whitebox-request"))
+	runner.Use("build_prompt", pipeline.BuildPrompt())
+	runner.Use("ask_llm", pipeline.AskLLM())
+	runner.Use("langfuse_end", pipeline.LangfuseEnd(lf))
+	runner.Use("logging", pipeline.Logging(logger))
 
 	state := &pipeline.State{
 		Input:   input.Msg,
