@@ -8,25 +8,23 @@ import (
 )
 
 type Config struct {
-	Msg      string
-	Model    string
-	Provider factory.ProviderOpts
+	Model      string
+	Provider   factory.ProviderOpts
+	SessionID  string
+	MaxHistory int
 }
 
 func ParseFlags() (Config, error) {
-	msg := flag.String("msg", "", "message to llm")
 	model := flag.String("model", "", "model name")
 	provider := flag.String("provider", "local", "provider: api | local")
 	providerName := flag.String("provider_name", "", "provider name like: deepseek, llamacpp")
+	sessionID := flag.String("session", "", "session ID for persistent chat")
+	maxHistory := flag.Int("max-history", 10, "maximum messages to keep in history")
 
 	flag.Parse()
 
 	if *model == "" {
 		return Config{}, errors.New("model required")
-	}
-
-	if *msg == "" {
-		return Config{}, errors.New("msg is empty")
 	}
 
 	normalizedProvider := strings.TrimSpace(strings.ToLower(*provider))
@@ -45,6 +43,7 @@ func ParseFlags() (Config, error) {
 			ProviderType: factory.ToProvider(normalizedProvider),
 			Name:         normalizedProviderName,
 		},
-		Msg: *msg,
+		SessionID:  *sessionID,
+		MaxHistory: *maxHistory,
 	}, nil
 }

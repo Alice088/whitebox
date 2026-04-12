@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"time"
+
 	"whitebox/internal/core/llm"
 	http2 "whitebox/internal/http"
 	"whitebox/internal/providers"
@@ -19,7 +20,7 @@ type Model struct {
 }
 
 func New(opts providers.InitOpts) llm.LLM {
-	url := "http://0.0.0.0:8080"
+	url := "http://localhost:8080"
 	if len(opts.BaseURL) != 0 {
 		url = opts.BaseURL
 	}
@@ -31,13 +32,13 @@ func New(opts providers.InitOpts) llm.LLM {
 	}
 }
 
-func (d Model) Ask(prompt string, systemPrompt string) (string, error) {
+func (d Model) Ask(prompt string) (string, error) {
 	url := d.baseURL + "/v1/chat/completions"
 
 	reqBody := http2.RequestBody{
 		Model: d.model,
 		Messages: []http2.Message{
-			{Role: "system", Content: systemPrompt},
+			{Role: "system", Content: "You are a helpful assistant."},
 			{Role: "user", Content: prompt},
 		},
 	}
@@ -69,7 +70,6 @@ func (d Model) Ask(prompt string, systemPrompt string) (string, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		fmt.Println("Error:", string(body))
 		return "", fmt.Errorf("status code is %s(%d): %s", resp.Status, resp.StatusCode, string(body))
 	}
 

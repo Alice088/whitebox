@@ -1,7 +1,7 @@
 package pipeline
 
 import (
-	syscontext "whitebox/internal/context"
+	syscontext "whitebox/internal/core/context"
 	llmcore "whitebox/internal/core/llm"
 )
 

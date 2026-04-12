@@ -50,20 +50,14 @@ func (r *Runner) Run(ctx context.Context, state *State) error {
 	return nil
 }
 
-func BuildSystemPrompt() Step {
-	return func(_ context.Context, s *State) error {
-		s.IO.SystemPrompt = s.Runtime.Context.Prompt()
-		return nil
-	}
-}
-
 func AskLLM() Step {
 	return func(_ context.Context, s *State) error {
 		if s.Runtime.LLM == nil {
 			return errors.New("llm is nil")
 		}
 
-		output, err := s.Runtime.LLM.Ask(s.IO.Input, s.IO.SystemPrompt)
+		prompt := s.Runtime.Context.Prompt()
+		output, err := s.Runtime.LLM.Ask(prompt)
 		if err != nil {
 			return err
 		}
@@ -137,9 +131,9 @@ func LangfuseGenerationEnd(client *langfuse.Langfuse) Step {
 
 		s.Observability.Generation.Output = model.M{"completion": s.IO.Output}
 		s.Observability.Generation.Usage = model.Usage{
-			Input:  int(s.Runtime.LLM.EstimateTokens(s.IO.Input)),
+			Input:  int(s.Runtime.LLM.EstimateTokens(s.Runtime.Context.Prompt())),
 			Output: int(s.Runtime.LLM.EstimateTokens(s.IO.Output)),
-			Total:  int(s.Runtime.LLM.EstimateTokens(s.IO.Output + s.IO.Input + s.IO.SystemPrompt)),
+			Total:  int(s.Runtime.LLM.EstimateTokens(s.Runtime.Context.Prompt() + s.IO.Output)),
 		}
 		_, err := client.GenerationEnd(s.Observability.Generation)
 		if err != nil {
@@ -161,8 +155,7 @@ func LangfuseGenerationStart(client *langfuse.Langfuse) Step {
 			Name:    "llm-call",
 			TraceID: s.Observability.TraceID,
 			Input: []model.M{
-				{"role": "system", "content": s.IO.SystemPrompt},
-				{"role": "user", "content": s.IO.Input},
+				{"role": "user", "content": s.Runtime.Context.Prompt()},
 			},
 		}, nil)
 		if err != nil {
