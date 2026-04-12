@@ -2,7 +2,10 @@
 <img src="./static/whitebox.jpg">
 </div>
 
+<div align="center">
+
 # whitebox
+</div>
 
 Your personal AI assistant where everything is under your control.
 
