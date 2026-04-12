@@ -6,14 +6,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 	cfg "whitebox/internal/config"
 	syscontext "whitebox/internal/core/context"
-	"whitebox/internal/core/llm"
+	xllm "whitebox/internal/core/llm"
 	"whitebox/internal/core/status"
 	"whitebox/internal/factory"
 	"whitebox/internal/flag"
-	xllm "whitebox/internal/providers"
+	"whitebox/internal/providers"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/henomis/langfuse-go"
@@ -80,7 +81,7 @@ func main() {
 
 	systemContext.Messages = msgs
 
-	llm, err := factory.LLM(input.Provider, xllm.InitOpts{
+	llm, err := factory.LLM(input.Provider, providers.InitOpts{
 		Model:  input.Model,
 		ApiKey: config.LLM.ApiKey,
 	})
@@ -92,7 +93,7 @@ func main() {
 	runChat(context.Background(), llm, &systemContext, sessionPath, input.MaxHistory, statusGen, logger)
 }
 
-func runChat(ctx context.Context, llm llm.LLM, systemContext *syscontext.Context,
+func runChat(ctx context.Context, llm xllm.LLM, systemContext *syscontext.Context,
 	sessionPath string, maxHistory int, statusGen *status.StatusGenerator,
 	logger zerolog.Logger) {
 
@@ -109,7 +110,7 @@ func runChat(ctx context.Context, llm llm.LLM, systemContext *syscontext.Context
 			break
 		}
 
-		input := scanner.Text()
+		input := strings.Trim(scanner.Text(), "\r\n\t ")
 
 		if input == "/exit" {
 			fmt.Println("Exiting...")
@@ -133,7 +134,13 @@ func runChat(ctx context.Context, llm llm.LLM, systemContext *syscontext.Context
 
 		systemContext.TrimMessages(maxHistory)
 
+		animation := status.NewAnimationController(statusGen)
+		animation.Start()
+
 		output, err := askWithLangfuse(ctx, llm, systemContext, input, logger)
+
+		animation.Stop()
+
 		if err != nil {
 			fmt.Printf("\033[91mError: %v\033[0m\n", err)
 			logger.Error().Err(err).Msg("LLM request failed")
@@ -163,7 +170,7 @@ func runChat(ctx context.Context, llm llm.LLM, systemContext *syscontext.Context
 	}
 }
 
-func askWithLangfuse(ctx context.Context, llm llm.LLM, systemContext *syscontext.Context, input string, logger zerolog.Logger) (string, error) {
+func askWithLangfuse(ctx context.Context, llm xllm.LLM, systemContext *syscontext.Context, input string, logger zerolog.Logger) (string, error) {
 	publicKey := os.Getenv("LANGFUSE_PUBLIC_KEY")
 	secretKey := os.Getenv("LANGFUSE_SECRET_KEY")
 	if publicKey == "" || secretKey == "" {
@@ -198,10 +205,13 @@ func askWithLangfuse(ctx context.Context, llm llm.LLM, systemContext *syscontext
 
 	output, err := llm.Ask(systemContext.Prompt())
 	if err != nil {
-		lf.GenerationEnd(&model.Generation{
+		_, gErr := lf.GenerationEnd(&model.Generation{
 			ID:     g.ID,
 			Output: model.M{"error": err.Error()},
 		})
+		if gErr != nil {
+			logger.Error().Err(err).Msg("failed to end langfuse generation")
+		}
 		return "", err
 	}
 
