@@ -13,7 +13,6 @@ import (
 )
 
 type State struct {
-	Name         string
 	Input        string
 	SystemPrompt string
 	Output       string
@@ -25,21 +24,14 @@ type State struct {
 	Meta    map[string]any
 }
 
-type ReadStep func(ctx context.Context, s State) error
-type MutStep func(ctx context.Context, s *State) error
+type Step func(ctx context.Context, s *State) error
 
 type Runner struct {
-	R      map[string]ReadStep
-	W      map[string]MutStep
-	Logger *zerolog.Logger
+	steps []Step
 }
 
-func (r *Runner) Read(step ReadStep, name string) {
-	r.R[name] = step
-}
-
-func (r *Runner) Write(step MutStep, name string) {
-	r.W[name] = step
+func (r *Runner) Use(step Step) {
+	r.steps = append(r.steps, step)
 }
 
 func (r *Runner) Run(ctx context.Context, state *State) error {
@@ -47,17 +39,7 @@ func (r *Runner) Run(ctx context.Context, state *State) error {
 		return errors.New("state is nil")
 	}
 
-	for name, step := range r.R {
-		r.Logger.Info().Str("step_mode", "read").Str("step_name", name).Msg("run step")
-
-		if err := step(ctx, *state); err != nil {
-			return err
-		}
-	}
-
-	for name, step := range r.W {
-		r.Logger.Info().Str("step_mode", "write").Str("step_name", name).Msg("run step")
-
+	for _, step := range r.steps {
 		if err := step(ctx, state); err != nil {
 			return err
 		}
@@ -66,14 +48,14 @@ func (r *Runner) Run(ctx context.Context, state *State) error {
 	return nil
 }
 
-func BuildPrompt() MutStep {
+func BuildPrompt() Step {
 	return func(_ context.Context, s *State) error {
 		s.SystemPrompt = s.Context.Prompt()
 		return nil
 	}
 }
 
-func AskLLM() MutStep {
+func AskLLM() Step {
 	return func(_ context.Context, s *State) error {
 		if s.LLM == nil {
 			return errors.New("llm is nil")
@@ -89,8 +71,8 @@ func AskLLM() MutStep {
 	}
 }
 
-func Logging(logger zerolog.Logger) ReadStep {
-	return func(_ context.Context, s State) error {
+func Logging(logger zerolog.Logger) Step {
+	return func(_ context.Context, s *State) error {
 		logger.Info().
 			Str("input", s.Input).
 			Str("output", s.Output).
@@ -99,16 +81,18 @@ func Logging(logger zerolog.Logger) ReadStep {
 	}
 }
 
-func LangfuseStart(client *langfuse.Langfuse, name string) MutStep {
+func LangfuseStart(client *langfuse.Langfuse, name string) Step {
 	return func(_ context.Context, s *State) error {
 		if client == nil {
 			return nil
 		}
 
+		now := time.Now()
+
 		trace, err := client.Trace(&model.Trace{
 			Name:      name,
 			Input:     s.Input,
-			Timestamp: new(time.Now()),
+			Timestamp: &now,
 		})
 		if err != nil {
 			return err
@@ -119,7 +103,7 @@ func LangfuseStart(client *langfuse.Langfuse, name string) MutStep {
 	}
 }
 
-func LangfuseEnd(client *langfuse.Langfuse) MutStep {
+func LangfuseEnd(client *langfuse.Langfuse) Step {
 	return func(_ context.Context, s *State) error {
 		if client == nil || s.TraceID == "" {
 			return nil
