@@ -2,6 +2,7 @@ package deepseek
 
 import (
 	"bytes"
+	"coreclaw/internal/context"
 	"coreclaw/internal/llm"
 	"encoding/json"
 	"fmt"
@@ -15,12 +16,12 @@ import (
 )
 
 type DeepSeek struct {
-	baseURL      string
-	apiKey       string
-	model        string
-	systemPrompt string
-	langFuse     *langfuse.Langfuse
-	logger       *zerolog.Logger
+	baseURL  string
+	apiKey   string
+	model    string
+	langFuse *langfuse.Langfuse
+	logger   *zerolog.Logger
+	context  context.Context
 }
 
 type Opts struct {
@@ -29,21 +30,22 @@ type Opts struct {
 	Model    string
 	LangFuse *langfuse.Langfuse
 	Logger   *zerolog.Logger
+	Context  context.Context
 }
 
-func New(opts Opts, systemPrompt string) llm.LLM {
+func New(opts Opts) llm.LLM {
 	url := "https://api.deepseek.com"
 	if len(opts.BaseURL) != 0 {
 		url = opts.BaseURL
 	}
 
 	return DeepSeek{
-		baseURL:      url,
-		apiKey:       opts.ApiKey,
-		model:        opts.Model,
-		langFuse:     opts.LangFuse,
-		systemPrompt: systemPrompt,
-		logger:       opts.Logger,
+		baseURL:  url,
+		apiKey:   opts.ApiKey,
+		model:    opts.Model,
+		langFuse: opts.LangFuse,
+		logger:   opts.Logger,
+		context:  opts.Context,
 	}
 }
 
@@ -54,7 +56,7 @@ func (d DeepSeek) Ask(prompt string, id string) (string, error) {
 	reqBody := llm.RequestBody{
 		Model: d.model,
 		Messages: []llm.Message{
-			{Role: "system", Content: d.systemPrompt},
+			{Role: "system", Content: d.context.Prompt()},
 			{Role: "user", Content: prompt},
 		},
 	}
@@ -81,7 +83,7 @@ func (d DeepSeek) Ask(prompt string, id string) (string, error) {
 		Name:    "llm-call",
 		TraceID: id,
 		Input: []model.M{
-			{"role": "system", "content": d.systemPrompt},
+			{"role": "system", "content": d.context.Prompt()},
 			{"role": "user", "content": prompt},
 		},
 	}, nil)
@@ -95,7 +97,7 @@ func (d DeepSeek) Ask(prompt string, id string) (string, error) {
 		g.Usage = model.Usage{
 			Input:  int(d.EstimateTokens(prompt)),
 			Output: int(d.EstimateTokens(answer)),
-			Total:  int(d.EstimateTokens(answer + prompt + d.systemPrompt)),
+			Total:  int(d.EstimateTokens(answer + prompt + d.context.Prompt())),
 		}
 		_, gErr := d.langFuse.GenerationEnd(g)
 		if gErr != nil {
