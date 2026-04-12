@@ -3,7 +3,8 @@ package main
 import (
 	"context"
 	"coreclaw/internal/config"
-	"coreclaw/internal/llm/deepseek"
+	xcontext "coreclaw/internal/context"
+	"coreclaw/internal/llm/llamacpp"
 	"fmt"
 	"os"
 	"time"
@@ -37,12 +38,26 @@ func main() {
 		logger.Fatal().Err(err).Send()
 	}
 
-	llm := deepseek.New(deepseek.Opts{
-		Model:    "deepseek-reasoner",
-		ApiKey:   cfg.LLM.ApiKey,
+	ctx := xcontext.Context{}
+	err = ctx.Collect(xcontext.CollectOpts{
+		ToolsPath:  "./context/tools",
+		MindPath:   "./context/mind",
+		MemoryPath: "./context/memory",
+		//MessagesPath: "nope",
+		SkillsPath: "./context/skills",
+	})
+
+	if err != nil {
+		logger.Fatal().Err(err).Msg("Failed to load context")
+	}
+
+	llm := llamacpp.New(llamacpp.Opts{
+		Model: "Gemopus-4-E4B-it-Preview-Q6_K.gguf",
+		//ApiKey:   cfg.LLM.ApiKey,
 		LangFuse: l,
 		Logger:   &logger,
-	}, "отвечай кратко и по делу")
+		Context:  ctx,
+	})
 
 	t, err := l.Trace(&model.Trace{
 		Name:      "coreclaw-request",
