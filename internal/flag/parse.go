@@ -4,7 +4,7 @@ import (
 	"errors"
 	"flag"
 	"strings"
-	"whitebox/internal/llm/factory"
+	"whitebox/internal/factory"
 )
 
 type Config struct {

@@ -1,4 +1,4 @@
-package llm
+package http
 
 type Message struct {
 	Role    string `json:"role"`

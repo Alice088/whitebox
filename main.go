@@ -7,9 +7,9 @@ import (
 	"time"
 	"whitebox/internal/config"
 	xcontext "whitebox/internal/context"
+	"whitebox/internal/factory"
 	"whitebox/internal/flag"
-	xllm "whitebox/internal/llm"
-	"whitebox/internal/llm/factory"
+	xllm "whitebox/internal/providers"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/henomis/langfuse-go"

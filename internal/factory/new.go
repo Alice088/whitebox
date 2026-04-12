@@ -4,9 +4,13 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"whitebox/internal/llm"
-	"whitebox/internal/llm/deepseek"
-	"whitebox/internal/llm/llamacpp"
+	"whitebox/internal/context"
+	llm2 "whitebox/internal/core/llm"
+	"whitebox/internal/providers/deepseek"
+	"whitebox/internal/providers/llamacpp"
+
+	"github.com/henomis/langfuse-go"
+	"github.com/rs/zerolog"
 )
 
 type Provider string
@@ -25,7 +29,7 @@ type ProviderOpts struct {
 	ProviderType Provider
 }
 
-type Constructor func(initOpts llm.InitOpts) llm.LLM
+type Constructor func(initOpts InitOpts) llm2.LLM
 
 var (
 	mu             sync.RWMutex
@@ -46,7 +50,7 @@ func RegisterLocal(name string, constructor Constructor) {
 	registerProvider(localProviders, name, constructor)
 }
 
-func New(providerOpts ProviderOpts, initOpts llm.InitOpts) (llm.LLM, error) {
+func New(providerOpts ProviderOpts, initOpts InitOpts) (llm2.LLM, error) {
 	providerName := normalizeProviderName(providerOpts)
 	constructor, err := resolveConstructor(providerOpts.ProviderType, providerName)
 	if err != nil {

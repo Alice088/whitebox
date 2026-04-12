@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"time"
 	"whitebox/internal/context"
-	"whitebox/internal/llm"
+	"whitebox/internal/core/llm"
+	http2 "whitebox/internal/http"
+	"whitebox/internal/providers"
 
 	"github.com/henomis/langfuse-go"
 	"github.com/henomis/langfuse-go/model"
@@ -24,7 +26,7 @@ type Model struct {
 	context  context.Context
 }
 
-func New(opts llm.InitOpts) llm.LLM {
+func New(opts providers.InitOpts) llm.LLM {
 	url := "http://0.0.0.0:8080"
 	if len(opts.BaseURL) != 0 {
 		url = opts.BaseURL
@@ -43,9 +45,9 @@ func New(opts llm.InitOpts) llm.LLM {
 func (d Model) Ask(prompt string, id string) (string, error) {
 	url := d.baseURL + "/v1/chat/completions"
 
-	reqBody := llm.RequestBody{
+	reqBody := http2.RequestBody{
 		Model: d.model,
-		Messages: []llm.Message{
+		Messages: []http2.Message{
 			{Role: "system", Content: d.context.Prompt()},
 			{Role: "user", Content: prompt},
 		},
@@ -111,7 +113,7 @@ func (d Model) Ask(prompt string, id string) (string, error) {
 		return "", fmt.Errorf("status code is %s(%d): %s", resp.Status, resp.StatusCode, string(body))
 	}
 
-	var response llm.ResponseBody
+	var response http2.ResponseBody
 	err = json.Unmarshal(body, &response)
 	if err != nil {
 		panic(err)
