@@ -1,12 +1,20 @@
 package context
 
+import (
+	"strings"
+)
+
 type Context struct {
-	Messages []Item
+	Messages []Message
 	Tools    []Item
 	Skills   []Item
 	Memory   []Item
 	Mind     []Item
-	prompt   string
+
+	staticPrompt   string
+	messagesPrompt string
+	staticValid    bool
+	messagesValid  bool
 }
 
 type Item struct {
@@ -23,35 +31,97 @@ type CollectOpts struct {
 }
 
 func (c *Context) Prompt() string {
-	if len(c.prompt) != 0 {
-		return c.prompt
+	c.buildStatic()
+	c.buildMessages()
+	return c.staticPrompt + c.messagesPrompt
+}
+
+func (c *Context) buildStatic() {
+	if c.staticValid {
+		return
 	}
 
+	var builder strings.Builder
+
 	for _, item := range c.Mind {
-		c.prompt += item.Content
+		builder.WriteString(item.Content)
 	}
 
 	for _, item := range c.Memory {
-		c.prompt += item.Content
+		builder.WriteString(item.Content)
 	}
 
 	for _, item := range c.Skills {
-		c.prompt += item.Content
+		builder.WriteString(item.Content)
 	}
 
 	for _, item := range c.Tools {
-		c.prompt += item.Content
+		builder.WriteString(item.Content)
 	}
 
-	for _, item := range c.Messages {
-		c.prompt += item.Content
+	c.staticPrompt = builder.String()
+	c.staticValid = true
+}
+
+func (c *Context) buildMessages() {
+	if c.messagesValid {
+		return
 	}
 
-	return c.prompt
+	var builder strings.Builder
+
+	for _, msg := range c.Messages {
+		builder.WriteString("\n")
+		builder.WriteString(msg.Role)
+		builder.WriteString(": ")
+		builder.WriteString(msg.Content)
+	}
+
+	c.messagesPrompt = builder.String()
+	c.messagesValid = true
+}
+
+func (c *Context) AddMessage(msg Message) {
+	c.Messages = append(c.Messages, msg)
+	c.messagesValid = false
+}
+
+func (c *Context) ClearMessages() {
+	c.Messages = []Message{}
+	c.messagesPrompt = ""
+	c.messagesValid = false
+}
+
+func (c *Context) TrimMessages(max int) {
+	if len(c.Messages) > max {
+		c.Messages = c.Messages[len(c.Messages)-max:]
+		c.messagesValid = false
+	}
+}
+
+func (c *Context) SetMind(items []Item) {
+	c.Mind = items
+	c.staticValid = false
+}
+
+func (c *Context) SetMemory(items []Item) {
+	c.Memory = items
+	c.staticValid = false
+}
+
+func (c *Context) SetSkills(items []Item) {
+	c.Skills = items
+	c.staticValid = false
+}
+
+func (c *Context) SetTools(items []Item) {
+	c.Tools = items
+	c.staticValid = false
 }
 
 func (c *Context) Collect(opts CollectOpts) error {
-	c.prompt = ""
+	c.staticValid = false
+	c.messagesValid = false
 	var err error
 
 	c.Mind, err = load(opts.MindPath)
@@ -70,11 +140,6 @@ func (c *Context) Collect(opts CollectOpts) error {
 	}
 
 	c.Tools, err = load(opts.ToolsPath)
-	if err != nil {
-		return err
-	}
-
-	c.Messages, err = load(opts.MessagesPath)
 	if err != nil {
 		return err
 	}
