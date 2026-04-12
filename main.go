@@ -4,16 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 	cfg "whitebox/internal/config"
 	syscontext "whitebox/internal/context"
 	"whitebox/internal/factory"
 	"whitebox/internal/flag"
+	"whitebox/internal/pipeline"
 	xllm "whitebox/internal/providers"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/henomis/langfuse-go"
-	"github.com/henomis/langfuse-go/model"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 )
@@ -32,8 +31,6 @@ func main() {
 		logger.Fatal().Err(err).Send()
 	}
 
-	l := langfuse.New(context.Background())
-
 	var config cfg.Config
 	err = env.Parse(&config)
 	if err != nil {
@@ -42,7 +39,7 @@ func main() {
 
 	systemContext, err := syscontext.NewDefault()
 	if err != nil {
-		logger.Fatal().Err(err).Msg("Failed to load context")
+		logger.Fatal().Err(err).Msg("failed to load context")
 	}
 
 	llm, err := factory.LLM(input.Provider, xllm.InitOpts{
@@ -50,55 +47,29 @@ func main() {
 		ApiKey: config.LLM.ApiKey,
 	})
 	if err != nil {
-		logger.Fatal().Err(err).Msg("Failed to init LLM")
+		logger.Fatal().Err(err).Msg("failed to init LLM")
 	}
 
-	t, err := l.Trace(&model.Trace{
-		Name:      "coreclaw-request",
-		Input:     input.Msg,
-		Timestamp: new(time.Now()),
-	})
+	lf := langfuse.New(context.Background())
+
+	runner := &pipeline.Runner{}
+	runner.Read(pipeline.Logging(logger))
+	runner.Write(pipeline.LangfuseStart(lf, "whitebox-request"))
+	runner.Write(pipeline.BuildPrompt())
+	runner.Write(pipeline.AskLLM())
+	runner.Write(pipeline.LangfuseEnd(lf))
+
+	state := &pipeline.State{
+		Input:   input.Msg,
+		LLM:     llm,
+		Context: systemContext,
+	}
+
+	err = runner.Run(context.Background(), state)
 	if err != nil {
-		logger.Fatal().Err(err).Send()
+		logger.Fatal().Err(err).Msg("pipeline failed")
 	}
 
-	generation, err := l.Generation(&model.Generation{
-		Model:   llm.Model(),
-		Name:    "llm-call",
-		TraceID: t.ID,
-		Input: []model.M{
-			{"role": "system", "content": systemContext.Prompt()},
-			{"role": "user", "content": input.Msg},
-		},
-	}, nil)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("Failed to create generation")
-	}
-
-	answer, err := llm.Ask(input.Msg, systemContext.Prompt())
-	if err != nil {
-		logger.Fatal().Err(err).Msg("Failed to ask LLM")
-	}
-
-	generation.Output = model.M{"completion": answer}
-	generation.Usage = model.Usage{
-		Input:  int(llm.EstimateTokens(input.Msg)),
-		Output: int(llm.EstimateTokens(answer)),
-		Total:  int(llm.EstimateTokens(answer + input.Msg + systemContext.Prompt())),
-	}
-	_, err = l.GenerationEnd(generation)
-	if err != nil {
-		logger.Error().Err(err).Msg("Failed to generation_end")
-	}
-
-	_, err = l.Trace(&model.Trace{
-		ID:     t.ID,
-		Output: answer,
-	})
-	if err != nil {
-		logger.Fatal().Err(err).Send()
-	}
-
-	l.Flush(context.TODO())
-	fmt.Printf("> %s\n", answer)
+	lf.Flush(context.Background())
+	fmt.Printf("> %s\n", state.Output)
 }
