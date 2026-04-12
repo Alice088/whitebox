@@ -58,7 +58,7 @@ func (r *Runner) Run(ctx context.Context, state *State) error {
 	return nil
 }
 
-func BuildPrompt() Step {
+func BuildSystemPrompt() Step {
 	return func(_ context.Context, s *State) error {
 		s.SystemPrompt = s.Context.Prompt()
 		return nil
