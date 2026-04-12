@@ -26,12 +26,18 @@ type State struct {
 
 type Step func(ctx context.Context, s *State) error
 
-type Runner struct {
-	steps []Step
+type namedStep struct {
+	name string
+	fn   Step
 }
 
-func (r *Runner) Use(step Step) {
-	r.steps = append(r.steps, step)
+type Runner struct {
+	steps  []namedStep
+	Logger *zerolog.Logger
+}
+
+func (r *Runner) Use(name string, step Step) {
+	r.steps = append(r.steps, namedStep{name: name, fn: step})
 }
 
 func (r *Runner) Run(ctx context.Context, state *State) error {
@@ -40,7 +46,11 @@ func (r *Runner) Run(ctx context.Context, state *State) error {
 	}
 
 	for _, step := range r.steps {
-		if err := step(ctx, state); err != nil {
+		if r.Logger != nil {
+			r.Logger.Info().Str("step", step.name).Msg("run step")
+		}
+
+		if err := step.fn(ctx, state); err != nil {
 			return err
 		}
 	}

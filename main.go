@@ -60,12 +60,12 @@ func main() {
 
 	lf := langfuse.New(context.Background())
 
-	runner := &pipeline.Runner{}
-	runner.Use(pipeline.LangfuseStart(lf, "whitebox-request"))
-	runner.Use(pipeline.BuildPrompt())
-	runner.Use(pipeline.AskLLM())
-	runner.Use(pipeline.LangfuseEnd(lf))
-	runner.Use(pipeline.Logging(logger))
+	runner := &pipeline.Runner{Logger: &logger}
+	runner.Use("langfuse_start", pipeline.LangfuseStart(lf, "whitebox-request"))
+	runner.Use("build_prompt", pipeline.BuildPrompt())
+	runner.Use("ask_llm", pipeline.AskLLM())
+	runner.Use("langfuse_end", pipeline.LangfuseEnd(lf))
+	runner.Use("logging", pipeline.Logging(logger))
 
 	state := &pipeline.State{
 		Input:   input.Msg,
