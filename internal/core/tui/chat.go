@@ -1,17 +1,15 @@
-package chat
+package tui
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 	syscontext "whitebox/internal/core/context"
 	"whitebox/internal/core/llm"
 	"whitebox/internal/core/status"
-	"whitebox/pkg/messages"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/henomis/langfuse-go"
 	"github.com/henomis/langfuse-go/model"
 	"github.com/rs/zerolog"
@@ -36,77 +34,12 @@ func New(llm llm.LLM, ctx *syscontext.Context, session syscontext.Session, logge
 }
 
 func (chat *Chat) Run(ctx context.Context) {
-	scanner := bufio.NewScanner(os.Stdin)
+	m := initialModel(chat, chat.Session.ID)
 
-	fmt.Println("Whitebox Chat Mode")
-	fmt.Printf("Session ID: %s\n", chat.Session.ID)
-	fmt.Println("Type '@exit' to quit, '@clear' to clear history")
-	fmt.Println()
-
-	for {
-		fmt.Print("> ")
-		if !scanner.Scan() {
-			break
-		}
-
-		input := strings.Trim(scanner.Text(), "\r\n\t ")
-
-		if strings.Contains(input, "@exit") {
-			fmt.Println("Exiting...")
-			break
-		}
-		if strings.Contains(input, "@clear") {
-			chat.Context.ClearMessages()
-			if err := chat.Session.SaveSession(chat.Context.Messages); err != nil {
-				messages.PrintError(fmt.Errorf("failed to save cleared session: %w", err))
-				chat.Logger.Error().Err(err).Msg("failed to save cleared session")
-			} else {
-				chat.Logger.Info().Msg("History cleared and saved.")
-				fmt.Println("History cleared and saved.")
-			}
-			continue
-		}
-
-		chat.Context.AddMessage(syscontext.Message{
-			Role:    "user",
-			Content: input,
-		})
-
-		chat.Context.TrimMessages(chat.Session.MaxMessages)
-
-		animation := status.NewAnimationController(chat.statusEngine)
-		animation.Start()
-
-		answer, err := chat.ask(ctx, input)
-
-		animation.Stop()
-
-		if err != nil {
-			messages.PrintError(err)
-			chat.Logger.Error().Err(err).Msg("LLM request failed")
-			continue
-		}
-
-		messages.PrintAssistant(answer)
-
-		chat.Context.AddMessage(syscontext.Message{
-			Role:    "assistant",
-			Content: answer,
-		})
-
-		chat.Context.TrimMessages(chat.Session.MaxMessages)
-
-		if len(chat.Context.Messages) > 0 {
-			if err = chat.Session.SaveSession(chat.Context.Messages); err != nil {
-				messages.PrintError(fmt.Errorf("failed to save session: %w", err))
-				chat.Logger.Error().Err(err).Msg("failed to save session")
-			} else {
-				chat.Logger.Info().
-					Str("session_path", chat.Session.Path).
-					Int("saved_messages", len(chat.Context.Messages)).
-					Msg("session saved")
-			}
-		}
+	p := tea.NewProgram(m)
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Oof: %v\n", err)
+		chat.Logger.Error().Err(err).Msg("failed to start tui")
 	}
 }
 

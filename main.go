@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"whitebox/internal/core/chat"
 	syscontext "whitebox/internal/core/context"
+	"whitebox/internal/core/tui"
 	"whitebox/internal/factory"
 	"whitebox/internal/flag"
 	"whitebox/internal/providers"
@@ -27,6 +27,6 @@ func main() {
 		logger.Fatal().Err(err).Msg("failed to init LLM")
 	}
 
-	tui := chat.New(llm, systemContext, session, logger)
-	tui.Run(context.Background())
+	chat := tui.New(llm, systemContext, session, logger)
+	chat.Run(context.Background())
 }
