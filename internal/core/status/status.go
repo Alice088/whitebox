@@ -20,6 +20,7 @@ type StatusEngine struct {
 	colorIndex  int
 	dotState    int
 	currentWord string
+	tickCount   int
 }
 
 func NewStatusEngine() *StatusEngine {
@@ -75,6 +76,12 @@ func (sg *StatusEngine) pickRandomWord() string {
 }
 
 func (sg *StatusEngine) NextAnimated() string {
+	sg.tickCount++
+
+	if sg.tickCount%24 == 0 {
+		sg.currentWord = sg.pickRandomWord()
+	}
+
 	sg.colorIndex = (sg.colorIndex + 1) % 216
 	colorCode := fmt.Sprintf("38;5;%d", sg.colorIndex+16)
 
