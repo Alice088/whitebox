@@ -32,13 +32,13 @@ func New(opts providers.InitOpts) llm.LLM {
 	}
 }
 
-func (d DeepSeek) Ask(prompt string) (string, error) {
+func (d DeepSeek) Ask(prompt, systemPrompt string) (string, error) {
 	url := d.baseURL + "/v1/chat/completions"
 
 	reqBody := http2.RequestBody{
 		Model: d.model,
 		Messages: []http2.Message{
-			{Role: "system", Content: "You are a helpful assistant."},
+			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: prompt},
 		},
 	}

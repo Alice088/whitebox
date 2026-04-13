@@ -7,13 +7,13 @@ import (
 )
 
 type AnimationController struct {
-	statusGen   *StatusGenerator
+	statusGen   *StatusEngine
 	isAnimating bool
 	stopChan    chan struct{}
 	doneChan    chan struct{}
 }
 
-func NewAnimationController(statusGen *StatusGenerator) *AnimationController {
+func NewAnimationController(statusGen *StatusEngine) *AnimationController {
 	return &AnimationController{
 		statusGen: statusGen,
 		stopChan:  make(chan struct{}),

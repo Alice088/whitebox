@@ -14,7 +14,7 @@ var statusWords = []string{
 	"⚒️  forging_visions", "🌅  awakening_dream", "📊  observing_subconscious", "🌀  folding_dreamspace", "👂  listening_within",
 }
 
-type StatusGenerator struct {
+type StatusEngine struct {
 	lastWord    string
 	rng         *rand.Rand
 	colorIndex  int
@@ -22,8 +22,8 @@ type StatusGenerator struct {
 	currentWord string
 }
 
-func NewStatusGenerator() *StatusGenerator {
-	sg := &StatusGenerator{
+func NewStatusEngine() *StatusEngine {
+	sg := &StatusEngine{
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
 		colorIndex: rand.New(rand.NewSource(time.Now().UnixNano())).Intn(216),
 		dotState:   0,
@@ -32,7 +32,7 @@ func NewStatusGenerator() *StatusGenerator {
 	return sg
 }
 
-func (sg *StatusGenerator) Next() string {
+func (sg *StatusEngine) Next() string {
 	var available []string
 	for _, word := range statusWords {
 		if word != sg.lastWord {
@@ -57,7 +57,7 @@ func (sg *StatusGenerator) Next() string {
 	return fmt.Sprintf("\033[%sm%s\033[0m", colorCode, word)
 }
 
-func (sg *StatusGenerator) pickRandomWord() string {
+func (sg *StatusEngine) pickRandomWord() string {
 	var available []string
 	for _, word := range statusWords {
 		if word != sg.lastWord {
@@ -74,7 +74,7 @@ func (sg *StatusGenerator) pickRandomWord() string {
 	return word
 }
 
-func (sg *StatusGenerator) NextAnimated() string {
+func (sg *StatusEngine) NextAnimated() string {
 	sg.colorIndex = (sg.colorIndex + 1) % 216
 	colorCode := fmt.Sprintf("38;5;%d", sg.colorIndex+16)
 
@@ -84,7 +84,7 @@ func (sg *StatusGenerator) NextAnimated() string {
 	return fmt.Sprintf("\033[%sm%s%s\033[0m", colorCode, sg.currentWord, dots)
 }
 
-func (sg *StatusGenerator) getDots() string {
+func (sg *StatusEngine) getDots() string {
 	switch sg.dotState {
 	case 0:
 		return "."
@@ -99,7 +99,7 @@ func (sg *StatusGenerator) getDots() string {
 	}
 }
 
-func (sg *StatusGenerator) randomColor() string {
+func (sg *StatusEngine) randomColor() string {
 	switch sg.rng.Intn(3) {
 	case 0:
 		return fmt.Sprintf("%d", sg.rng.Intn(7)+31)
