@@ -7,14 +7,14 @@ import (
 	"whitebox/internal/factory"
 )
 
-type Config struct {
+type Input struct {
 	Model      string
 	Provider   factory.ProviderOpts
 	SessionID  string
 	MaxHistory int
 }
 
-func ParseFlags() (Config, error) {
+func ParseFlags() (Input, error) {
 	model := flag.String("model", "", "model name")
 	provider := flag.String("provider", "local", "provider: api | local")
 	providerName := flag.String("provider_name", "", "provider name like: deepseek, llamacpp")
@@ -24,20 +24,20 @@ func ParseFlags() (Config, error) {
 	flag.Parse()
 
 	if *model == "" {
-		return Config{}, errors.New("model required")
+		return Input{}, errors.New("model required")
 	}
 
 	normalizedProvider := strings.TrimSpace(strings.ToLower(*provider))
 	if normalizedProvider != string(factory.APIProvider) && normalizedProvider != string(factory.LocalProvider) {
-		return Config{}, errors.New("provider must be 'api' or 'local'")
+		return Input{}, errors.New("provider must be 'api' or 'local'")
 	}
 
 	normalizedProviderName := strings.TrimSpace(strings.ToLower(*providerName))
 	if normalizedProvider == string(factory.APIProvider) && normalizedProviderName == "" {
-		return Config{}, errors.New("provider_name required for api provider")
+		return Input{}, errors.New("provider_name required for api provider")
 	}
 
-	return Config{
+	return Input{
 		Model: *model,
 		Provider: factory.ProviderOpts{
 			ProviderType: factory.ToProvider(normalizedProvider),
