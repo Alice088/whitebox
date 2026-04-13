@@ -6,8 +6,6 @@ import (
 	"sync"
 	llm2 "whitebox/internal/core/llm"
 	"whitebox/internal/providers"
-	"whitebox/internal/providers/deepseek"
-	"whitebox/internal/providers/llamacpp"
 )
 
 type Provider string
@@ -34,11 +32,6 @@ var (
 	localProviders = make(map[string]Constructor)
 )
 
-func init() {
-	RegisterAPI("deepseek", deepseek.New)
-	RegisterLocal(defaultLocalProvider, llamacpp.New)
-}
-
 func RegisterAPI(name string, constructor Constructor) {
 	registerProvider(apiProviders, name, constructor)
 }
@@ -48,6 +41,8 @@ func RegisterLocal(name string, constructor Constructor) {
 }
 
 func LLM(providerOpts ProviderOpts, initOpts providers.InitOpts) (llm2.LLM, error) {
+	registerProviders()
+
 	providerName := normalizeProviderName(providerOpts)
 	constructor, err := resolveConstructor(providerOpts.ProviderType, providerName)
 	if err != nil {
