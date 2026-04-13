@@ -7,7 +7,7 @@ import (
 	"time"
 	syscontext "whitebox/internal/core/context"
 	"whitebox/internal/core/llm"
-	"whitebox/internal/core/status"
+	"whitebox/internal/core/tui/status"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/henomis/langfuse-go"
