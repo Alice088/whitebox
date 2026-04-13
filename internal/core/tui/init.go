@@ -2,10 +2,12 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 	syscontext "whitebox/internal/core/context"
+	"whitebox/internal/core/tools"
 
 	"charm.land/bubbles/v2/cursor"
 	"charm.land/bubbles/v2/textarea"
@@ -136,7 +138,36 @@ func (m tuiModel) Init() tea.Cmd {
 func askCmd(chat *Chat, input string) tea.Cmd {
 	return func() tea.Msg {
 		out, err := chat.ask(context.Background(), input)
-		return answerMsg{text: out, err: err}
+		tc, ok := tools.TryParseToolCall(out)
+		if !ok {
+			return answerMsg{text: out, err: err}
+		}
+
+		chat.Logger.Info().Msg("Tool call request")
+
+		switch tc.Tool {
+		case "read_file":
+			chat.Logger.Info().Str("Tool", tc.Tool).Str("Path", tc.Arguments.Path).Msg("Tool call")
+
+			content, err := tools.ReadFile(tc.Arguments.Path)
+			if err != nil {
+				chat.Logger.Error().Err(err).Str("Tool", tc.Tool).Str("Path", tc.Arguments.Path).Msg("Tool call failed")
+				return answerMsg{text: out, err: err}
+			}
+
+			finalPrompt := fmt.Sprintf(`
+				User asked: %s
+				Tool read_file result:
+				%s
+				Now answer the user normally.
+				`, input, content)
+
+			out, err = chat.LLM.Ask(finalPrompt, chat.Context.Prompt())
+			chat.Logger.Info().Str("Tool", tc.Tool).Str("Path", tc.Arguments.Path).Str("Answer", out).Msg("Tool call answer")
+			return answerMsg{text: out, err: err}
+		}
+
+		return answerMsg{text: "", err: errors.New("invalid tool call")}
 	}
 }
 
