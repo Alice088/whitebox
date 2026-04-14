@@ -1,13 +1,47 @@
 #!/bin/bash
 
 APP=whitebox
+DIST=dist
 
-mkdir -p dist
+rm -rf $DIST
+mkdir -p $DIST
 
 echo "Building..."
 
-GOOS=linux GOARCH=amd64 go build -o dist/$APP-linux
-GOOS=darwin GOARCH=arm64 go build -o dist/$APP-mac
-GOOS=windows GOARCH=amd64 go build -o dist/$APP.exe
+build() {
+  OS=$1
+  ARCH=$2
+  EXT=$3
+
+  NAME="$APP-$OS"
+  OUT_DIR="$DIST/$NAME"
+
+  mkdir -p "$OUT_DIR"
+
+  echo "→ $OS/$ARCH"
+
+  GOOS=$OS GOARCH=$ARCH go build -o "$OUT_DIR/$APP$EXT"
+
+  # playbox
+  cp -r ./playbox "$OUT_DIR/"
+
+  # .env.example (если есть)
+  if [ -f ".env.example" ]; then
+    cp .env.example "$OUT_DIR/.env.example"
+  fi
+
+  # архив
+  if [ "$OS" = "windows" ]; then
+    (cd $DIST && zip -r "$NAME.zip" "$NAME" >/dev/null)
+  else
+    tar -czf "$DIST/$NAME.tar.gz" -C "$DIST" "$NAME"
+  fi
+
+  rm -rf "$OUT_DIR"
+}
+
+build linux amd64 ""
+build darwin arm64 ""
+build windows amd64 ".exe"
 
 echo "Done → dist/"
