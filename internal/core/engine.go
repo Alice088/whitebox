@@ -6,6 +6,7 @@ import (
 	"whitebox/internal/core/context"
 	"whitebox/internal/core/llm"
 	"whitebox/internal/core/tools"
+	"whitebox/pkg/messages"
 )
 
 type Engine struct {
@@ -15,7 +16,7 @@ type Engine struct {
 }
 
 func (e *Engine) Run(input string, emit func(Event)) (string, error) {
-	state := &State{Input: input}
+	state := &State{Input: input, Task: input}
 
 	for i := 0; i < e.CallChain.Max; i++ {
 		emit(Event{"debug", fmt.Sprintf("loop start (i=%d)", i+1)})
@@ -32,25 +33,51 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 		}
 		emit(Event{"debug", fmt.Sprintf("LLM OUTPUT: [%s]", out)})
 
-		if tc, ok := tools.TryParseToolCall(out); ok {
+		if tc, ok := tools.IsToolCall(out); ok {
 			result, err := tools.Execute(tc)
-			emit(Event{"tool_call", fmt.Sprintf("%s (%+v) \n - %s", tc.Tool, tc.Arguments, result)})
+			emit(Event{"tool_call", fmt.Sprintf("%s (%+v) \n - %s", tc.Tool, messages.LimitArgs(tc.Arguments, 40), messages.OutputLimit(result, 100))})
+			state.History += fmt.Sprintf(`
+						- Tool: %s
+						  Args: %+v
+						  Result: %s
+						  Error(if exists): %v
+			`, tc.Tool, tc.Arguments, result, err)
+
 			if err != nil {
+				emit(Event{Type: "error", Data: fmt.Sprintf("Call %s (%+v) \n - %s", tc.Tool, tc.Arguments, err.Error())})
+
 				state.Input = fmt.Sprintf(`
 					Tool "%s" executed with error.
-					
+
+					You must NOT use this pattern again
 					Result:
 					%s
 					`, tc.Tool, err.Error())
 			} else {
 				state.Input = fmt.Sprintf(`
-					Tool "%s" executed.
-					
-					Result:
-					%s
-					
-					Now give final answer to user. DO NOT call tool again.
-					`, tc.Tool, result)
+						You are solving a task step by step.
+						
+						Task:
+						%s
+						
+						Previous actions:
+						%s
+						
+						Last tool result:
+						Tool: %s
+						Result:
+						%s
+						
+						Rules:
+						
+						1. If the task is already completed — give final answer.
+						2. Do NOT repeat the same action if it already succeeded.
+						3. Only call a tool if new information or action is required.
+						4. If no further action is needed — respond with final answer.
+						
+						Decide your next step.
+					`, state.Task, state.History, tc.Tool, result) //todo это тоже в контекст перенести
+
 			}
 			continue
 		}
