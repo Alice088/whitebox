@@ -4,45 +4,45 @@
 
 # Whitebox
 
-Персональный AI-ассистент, где контекст управляется явно.
+A personal AI assistant where context is explicitly controlled.
 
-Whitebox сделан для случаев, когда важны воспроизводимость, контроль затрат и понимание того, **что именно видит модель**.
+Whitebox is designed for cases where reproducibility, cost control, and understanding **what the model actually sees** matter.
 
 ---
 
 ## 1. What is Whitebox
 
-Whitebox — это минимальный runtime для работы с LLM.
+Whitebox is a minimal runtime for working with LLMs.
 
-Он существует, чтобы убрать скрытую логику из агентных систем:
+It exists to remove hidden logic from agent systems:
 
-- контекст задается файлами, а не «магией»
-- в langfuse каждый шаг выполнения и траты можно отследить
+- context is defined by files, not “magic”
+- every step and cost can be observed (e.g. via Langfuse)
 
-Ключевая идея: **контекст — это продуктовый интерфейс, а не внутренность модели**.
+Core idea: **context is a product interface, not an internal detail of the model**.
 
 ---
 
 ## 2. Problem
 
-Большинство AI-решений ведут себя как black box:
+Most AI systems behave like black boxes:
 
-- контекст растет без ограничений
-- в prompt попадает шум
-- сложно понять, почему модель ответила именно так
-- токены тратятся непредсказуемо
+- context grows without limits
+- noise leaks into the prompt
+- it’s unclear why the model answered the way it did
+- token usage becomes unpredictable
 
-Итог: больше контекста ≠ лучше ответ.
+Result: more context ≠ better answers.
 
 ---
 
 ## 3. Core Idea
 
-Whitebox строится вокруг трёх принципов:
+Whitebox is built around three principles:
 
-- **Context as single source of truth**: модель видит только то, что лежит в `~/.whitebox/context`
-- **No hidden magic**: нет неявных системных слоев, скрытых автоподмешиваний и «умных» решений за пользователя
-- **System controls context, not LLM**: управление фокусом — на стороне системы и файловой структуры
+- **Context as a single source of truth**: the model sees only what is inside `~/.whitebox/context`
+- **No hidden magic**: no implicit system layers, hidden injections, or automatic decisions
+- **System controls context, not LLM**: focus is managed by the system and file structure
 
 ---
 
@@ -50,31 +50,31 @@ Whitebox строится вокруг трёх принципов:
 
 ### Engine
 
-Цикл выполнения:
+Execution loop:
 
-- собирает prompt из Context
-- вызывает LLM
-- проверяет, не попросила ли модель вызвать tool
-- при необходимости выполняет tool и продолжает loop
-- завершает ответом пользователю
+- builds prompt from Context
+- calls the LLM
+- checks for tool calls
+- executes tools if needed and continues the loop
+- returns final answer
 
 ### Context
 
-Контекст собирается из директорий:
+Context is assembled from directories:
 
 1. `minds/`
 2. `memories/`
 3. `skills/`
 4. `tools/`
-5. `sessions/` (история диалога)
+5. `sessions/` (chat history)
 
-Порядок фиксированный и предсказуемый.
+Order is fixed and deterministic.
 
 ### Tools
 
-Tool call — это обычный JSON в ответе модели.
+Tool calls are plain JSON returned by the model.
 
-Пример формата:
+Example:
 
 ```json
 {
@@ -83,47 +83,47 @@ Tool call — это обычный JSON в ответе модели.
     "path": "notes/todo.md"
   }
 }
-```
+````
 
 ### State
 
-Во время выполнения хранится простой state:
+Execution state is simple:
 
-- текущий input
-- output модели
-- число шагов в call chain
+* current input
+* model output
+* number of steps in the call chain
 
-Никаких скрытых фоновых агентов.
+No hidden background agents.
 
 ### TUI
 
-CLI-интерфейс на Bubble Tea:
+CLI interface built with Bubble Tea:
 
-- ввод запроса
-- live-события (`debug`, `tool_call`, `final`)
-- сохранение истории сессии
+* user input
+* live events (`debug`, `tool_call`, `final`)
+* session history persistence
 
 ---
 
 ## 5. How it works
 
-Поток выполнения:
+Execution flow:
 
 1. User input
 2. Engine loop
-3. Запрос в LLM
-4. Если нужен tool → выполнение tool
-5. Результат tool возвращается в loop
-6. Финальный ответ пользователю
-7. Ответ сохраняется в историю сессии
+3. LLM call
+4. If tool is needed → execute tool
+5. Tool result goes back into the loop
+6. Final answer is generated
+7. Answer is saved in session history
 
 ---
 
 ## 6. Context System
 
-Это главный слой Whitebox.
+This is the core layer of Whitebox.
 
-После первого запуска создается структура:
+After first run, the structure is created:
 
 ```text
 ~/.whitebox/
@@ -136,33 +136,33 @@ CLI-интерфейс на Bubble Tea:
   workspace/
 ```
 
-Что важно:
+Key points:
 
-- все файлы в `context/*` реально участвуют в prompt
-- все, что вне этой структуры, для модели «не существует»
-- контекст можно явно чистить, сжимать и пересобирать
+* everything in `context/*` is included in the prompt
+* anything outside does not exist for the model
+* context can be explicitly cleaned, compressed, and rebuilt
 
-Практический эффект:
+Practical effect:
 
-- меньше шума
-- ниже стоимость токенов
-- стабильнее ответы
+* less noise
+* lower token cost
+* more stable outputs
 
 ---
 
 ## 7. Features
 
-- Прозрачный и файловый контекст
-- Явный control loop выполнения
-- Tool calling через JSON
-- Наблюдаемость через события и debug-режим
-- Минимальная архитектура без скрытых слоев
+* Transparent file-based context
+* Explicit execution loop
+* Tool calling via JSON
+* Observability via events and debug mode
+* Minimal architecture without hidden layers
 
 ---
 
 ## 8. Getting Started
 
-### 1) Установка
+### 1) Install
 
 ```bash
 git clone https://github.com/Alice088/whitebox.git
@@ -170,50 +170,50 @@ cd whitebox
 go mod download
 ```
 
-### 2) Конфигурация
+### 2) Configure
 
 ```bash
 cp .env.example .env
 ```
 
-Заполните минимум:
+Set at least:
 
-- `LLM_API_KEY`
-- `SESSION_MAX_MESSAGES`
-- `CALL_CHAIN_MAX`
+* `LLM_API_KEY`
+* `SESSION_MAX_MESSAGES`
+* `CALL_CHAIN_MAX`
 
-### 3) Запуск
+### 3) Run
 
-Локальный провайдер:
+Local provider:
 
 ```bash
 go run . --model <your-model> --provider local
 ```
 
-API-провайдер (например deepseek):
+API provider (e.g. DeepSeek):
 
 ```bash
 go run . --model <your-model> --provider api --provider_name deepseek
 ```
 
-### 4) Первый запрос
+### 4) First request
 
-Введите сообщение в TUI и нажмите Enter.
+Type a message in the TUI and press Enter.
 
 ---
 
 ## 9. Examples
 
-### Обычный диалог
+### Basic conversation
 
 ```text
-You: Сформулируй план миграции сервиса на Go.
+You: Create a migration plan for a Go service.
 Assistant: ...
 ```
 
-### Чтение файла через tool
+### Reading a file via tool
 
-Модель может вернуть:
+Model may return:
 
 ```json
 {
@@ -222,33 +222,33 @@ Assistant: ...
 }
 ```
 
-Engine прочитает файл из `~/.whitebox/workspace/docs/spec.md`, передаст результат обратно модели и запросит финальный ответ.
+Engine reads the file from `~/.whitebox/workspace/docs/spec.md`, returns the result to the model, and requests a final answer.
 
-### Работа с контекстом
+### Working with context
 
-1. Добавьте `minds/product.md`
-2. Добавьте `skills/code-review.md`
-3. Перезапустите сессию
+1. Add `minds/product.md`
+2. Add `skills/code-review.md`
+3. Restart session
 
-Теперь эти файлы будут частью системного prompt.
+These files become part of the system prompt.
 
 ---
 
 ## 10. Philosophy
 
-Whitebox следует простым правилам:
+Whitebox follows simple rules:
 
-- **Минимальность > сложность**
-- **Контроль > автоматизация**
-- **Явность > магия**
+* **Minimalism > complexity**
+* **Control > automation**
+* **Explicitness > magic**
 
-Это не «умный автономный агент».
+This is not a “smart autonomous agent”.
 
-Это инженерный инструмент, где вы управляете контекстом, стоимостью и поведением.
+It is an engineering tool where you control context, cost, and behavior.
 
 ---
 
 ## Project status
 
-Whitebox активно развивается.
-Если вам важны предсказуемость и наблюдаемость в LLM-системах — это правильная база.
+Whitebox is under active development.
+If you care about reproducibility and observability in LLM systems — this is a solid foundation.
