@@ -4,11 +4,12 @@ import "encoding/json"
 
 type ToolCall struct {
 	Tool      string    `json:"tool"`
-	Arguments Arguments `json:"arguments"`
+	Arguments Arguments `json:"arguments,omitzero"`
 }
 
 type Arguments struct {
-	Path string `json:"path"`
+	Path    string `json:"path"`
+	Content string `json:"content"`
 }
 
 func TryParseToolCall(s string) (ToolCall, bool) {

@@ -11,16 +11,17 @@ func mustBaseDir() string {
 	if err != nil {
 		panic(err)
 	}
-	return filepath.Join(home, ".whitebox", "context")
+	return filepath.Join(home, ".whitebox")
 }
 
 var (
-	BaseDir     = mustBaseDir()
-	ToolsDir    = filepath.Join(BaseDir, "tools")
-	SkillsDir   = filepath.Join(BaseDir, "skills")
-	MemoriesDir = filepath.Join(BaseDir, "memories")
-	MindsDir    = filepath.Join(BaseDir, "minds")
-	SessionsDir = filepath.Join(BaseDir, "sessions")
+	BaseDir      = mustBaseDir()
+	WorkspaceDir = filepath.Join(BaseDir, "workspace")
+	ToolsDir     = filepath.Join(BaseDir, "context", "tools")
+	SkillsDir    = filepath.Join(BaseDir, "context", "skills")
+	MemoriesDir  = filepath.Join(BaseDir, "context", "memories")
+	MindsDir     = filepath.Join(BaseDir, "context", "minds")
+	SessionsDir  = filepath.Join(BaseDir, "context", "sessions")
 )
 
 type Context struct {
