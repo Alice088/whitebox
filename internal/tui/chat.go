@@ -7,10 +7,11 @@ import (
 	"time"
 	syscontext "whitebox/internal/core/context"
 	"whitebox/internal/core/llm"
+	"whitebox/internal/core/tracer"
 	"whitebox/internal/core/tui/status"
+	"whitebox/internal/core/wrapfuse"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/henomis/langfuse-go"
 	"github.com/henomis/langfuse-go/model"
 	"github.com/rs/zerolog"
 )
@@ -19,17 +20,18 @@ type Chat struct {
 	LLM          llm.LLM
 	Context      *syscontext.Context
 	Logger       zerolog.Logger
-	Session      syscontext.Session
 	statusEngine *status.StatusEngine
+	Tracer       tracer.Tracer
 }
 
-func New(llm llm.LLM, ctx *syscontext.Context, session syscontext.Session, logger zerolog.Logger) Chat {
+func New(llm llm.LLM, ctx *syscontext.Context, session syscontext.Sessions, tracer tracer.Tracer, logger zerolog.Logger) Chat {
 	return Chat{
 		Context:      ctx,
 		LLM:          llm,
 		Logger:       logger,
 		Session:      session,
 		statusEngine: status.NewStatusEngine(),
+		Tracer:       tracer,
 	}
 }
 
@@ -44,10 +46,12 @@ func (chat *Chat) Run(ctx context.Context) {
 }
 
 func (chat *Chat) ask(ctx context.Context, input string) (string, error) {
-	lf := langfuse.New(ctx)
-	defer lf.Flush(ctx)
+	lf := chat.Wrapfuse.NewClient(ctx)
+	defer func() {
+		chat.Wrapfuse.Flush(lf, ctx)
+	}()
 
-	trace, err := lf.Trace(&model.Trace{
+	trace, err := chat.Wrapfuse.Trace(lf, &model.Trace{
 		Name:      "whitebox-chat",
 		Input:     input,
 		Timestamp: new(time.Now()),
@@ -57,10 +61,15 @@ func (chat *Chat) ask(ctx context.Context, input string) (string, error) {
 		return chat.LLM.Ask(input, chat.Context.Prompt())
 	}
 
-	g, err := lf.Generation(&model.Generation{
+	traceID := ""
+	if chat.Wrapfuse.Enabled {
+		traceID = trace.ID
+	}
+
+	generation, err := chat.Wrapfuse.Generation(lf, &model.Generation{
 		Model:   chat.LLM.Model(),
 		Name:    "llm-call",
-		TraceID: trace.ID,
+		TraceID: traceID,
 		Input: []model.M{
 			{"role": "system", "content": chat.Context.Prompt()},
 			{"role": "user", "content": input},
@@ -71,10 +80,15 @@ func (chat *Chat) ask(ctx context.Context, input string) (string, error) {
 		return chat.LLM.Ask(input, chat.Context.Prompt())
 	}
 
+	generationID := ""
+	if chat.Wrapfuse.Enabled {
+		generationID = generation.ID
+	}
+
 	output, err := chat.LLM.Ask(input, chat.Context.Prompt())
 	if err != nil {
-		_, gErr := lf.GenerationEnd(&model.Generation{
-			ID:     g.ID,
+		_, gErr := chat.Wrapfuse.GenerationEnd(lf, &model.Generation{
+			ID:     generationID,
 			Output: model.M{"error": err.Error()},
 		})
 		if gErr != nil {
@@ -83,20 +97,20 @@ func (chat *Chat) ask(ctx context.Context, input string) (string, error) {
 		return "", err
 	}
 
-	g.Output = model.M{"completion": output}
-	g.Usage = model.Usage{
+	generation.Output = model.M{"completion": output}
+	generation.Usage = model.Usage{
 		Input:  int(chat.LLM.EstimateTokens(input)),
 		Output: int(chat.LLM.EstimateTokens(output)),
 		Total:  int(chat.LLM.EstimateTokens(input + chat.Context.Prompt() + output)),
 	}
 
-	_, err = lf.GenerationEnd(g)
+	_, err = chat.Wrapfuse.GenerationEnd(lf, generation)
 	if err != nil {
 		chat.Logger.Error().Err(err).Msg("failed to end langfuse generation")
 	}
 
-	_, err = lf.Trace(&model.Trace{
-		ID:     trace.ID,
+	_, err = chat.Wrapfuse.Trace(lf, &model.Trace{
+		ID:     traceID,
 		Output: output,
 	})
 	if err != nil {

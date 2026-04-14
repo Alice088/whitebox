@@ -107,7 +107,7 @@ func initialModel(chat *Chat, sessionID string) tuiModel {
 
 	messages := []string{
 		"Whitebox Chat Mode",
-		fmt.Sprintf("Session ID: %s", sessionID),
+		fmt.Sprintf("Sessions ID: %s", sessionID),
 		"Type '@exit' to quit, '@clear' to clear history",
 	}
 
