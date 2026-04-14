@@ -36,9 +36,21 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 			result, err := tools.Execute(tc)
 			emit(Event{"tool_call", fmt.Sprintf("%s (%+v) \n - %s", tc.Tool, tc.Arguments, result)})
 			if err != nil {
-				state.Input = fmt.Sprintf("Tool result(%s; args: %+v): %s", tc.Tool, tc.Arguments, err.Error())
+				state.Input = fmt.Sprintf(`
+					Tool "%s" executed with error.
+					
+					Result:
+					%s
+					`, tc.Tool, err.Error())
 			} else {
-				state.Input = fmt.Sprintf("Tool result(%s; args: %+v): %s", tc.Tool, tc.Arguments, result)
+				state.Input = fmt.Sprintf(`
+					Tool "%s" executed.
+					
+					Result:
+					%s
+					
+					Now give final answer to user. DO NOT call tool again.
+					`, tc.Tool, result)
 			}
 			continue
 		}
