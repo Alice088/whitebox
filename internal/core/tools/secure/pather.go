@@ -1,13 +1,14 @@
-package tools
+package secure
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"whitebox/internal/paths"
 )
 
-func securePath(baseDir, path string) (string, error) {
+func Path(path string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("empty path")
 	}
@@ -18,11 +19,11 @@ func securePath(baseDir, path string) (string, error) {
 	}
 
 	// собираем полный путь
-	fullPath := filepath.Join(baseDir, path)
+	fullPath := filepath.Join(paths.WorkspaceDir, path)
 	cleanPath := filepath.Clean(fullPath)
 
 	// проверка выхода через ../
-	rel, err := filepath.Rel(baseDir, cleanPath)
+	rel, err := filepath.Rel(paths.WorkspaceDir, cleanPath)
 	if err != nil {
 		return "", fmt.Errorf("invalid path")
 	}
@@ -41,7 +42,7 @@ func securePath(baseDir, path string) (string, error) {
 	}
 
 	// повторная проверка после symlink
-	rel, err = filepath.Rel(baseDir, realPath)
+	rel, err = filepath.Rel(paths.WorkspaceDir, realPath)
 	if err != nil {
 		return "", fmt.Errorf("invalid path")
 	}

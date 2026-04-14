@@ -1,0 +1,30 @@
+{
+  "whitelist": [
+    "^ls(\\s|$)",
+    "^cat(\\s|$)",
+    "^echo(\\s|$)",
+    "^pwd$",
+    "^whoami$",
+    "^date$"
+  ],
+  "blacklist": [
+    "(^|\\s)rm\\s+-rf\\b",
+    "(^|\\s)mkfs\\b",
+    "(^|\\s)dd\\b",
+    "(^|\\s)shutdown\\b",
+    "(^|\\s)reboot\\b",
+    "(^|\\s)init\\b",
+    "(^|\\s):\\(\\)\\s*\\{\\s*:\\|:&\\s*\\};:",
+    "[;&|]{2,}",
+    "\\$\\(",
+    "`",
+    ">/dev/",
+    "/etc/passwd",
+    "/etc/shadow",
+    "/root/",
+    "\\.\\./",
+    "^\\s*/",
+    "/bin/rm",
+    "/usr/bin/rm"
+  ]
+}
