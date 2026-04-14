@@ -1,27 +1,8 @@
 package context
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
-)
-
-func mustBaseDir() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
-	}
-	return filepath.Join(home, ".whitebox")
-}
-
-var (
-	BaseDir      = mustBaseDir()
-	WorkspaceDir = filepath.Join(BaseDir, "workspace")
-	ToolsDir     = filepath.Join(BaseDir, "context", "tools")
-	SkillsDir    = filepath.Join(BaseDir, "context", "skills")
-	MemoriesDir  = filepath.Join(BaseDir, "context", "memories")
-	MindsDir     = filepath.Join(BaseDir, "context", "minds")
-	SessionsDir  = filepath.Join(BaseDir, "context", "sessions")
+	"whitebox/internal/paths"
 )
 
 type Context struct {
@@ -79,22 +60,22 @@ func (c *Context) AddMessage(msg Message) error {
 func (c *Context) Collect() error {
 	var err error
 
-	c.Minds, err = load(MindsDir)
+	c.Minds, err = load(paths.MindsDir)
 	if err != nil {
 		return err
 	}
 
-	c.Memories, err = load(MemoriesDir)
+	c.Memories, err = load(paths.MemoriesDir)
 	if err != nil {
 		return err
 	}
 
-	c.Skills, err = load(SkillsDir)
+	c.Skills, err = load(paths.SkillsDir)
 	if err != nil {
 		return err
 	}
 
-	c.Tools, err = load(ToolsDir)
+	c.Tools, err = load(paths.ToolsDir)
 	if err != nil {
 		return err
 	}

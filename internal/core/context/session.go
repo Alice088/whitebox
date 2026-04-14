@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"whitebox/internal/config"
+	"whitebox/internal/paths"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -71,12 +72,12 @@ func (s *Sessions) SaveSession(msgs []Message) error {
 }
 
 func (s *Sessions) CreateSessionDir() error {
-	if err := os.MkdirAll(SessionsDir, 0755); err != nil {
+	if err := os.MkdirAll(paths.SessionsDir, 0755); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (s *Sessions) Path() string {
-	return fmt.Sprintf("%s/%s.json", SessionsDir, s.ID)
+	return fmt.Sprintf("%s/%s.json", paths.SessionsDir, s.ID)
 }
