@@ -9,9 +9,19 @@ import (
 	"whitebox/internal/tui"
 	"whitebox/pkg/cfg"
 	"whitebox/pkg/logging"
+	"whitebox/pkg/wbinit"
 )
 
+func init() {
+	baseDir, err := wbinit.EnsureWhitebox()
+	if err != nil {
+		panic("Failed to init .whitebox")
+	}
+	syscontext.BaseDir = baseDir + "/context"
+}
+
 func main() {
+
 	logger := logging.MustLogger()
 	input := flag.MustInput(logger)
 	config := cfg.MustConfig(logger)
