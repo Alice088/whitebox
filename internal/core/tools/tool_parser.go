@@ -11,13 +11,13 @@ type Arguments struct {
 	Path string `json:"path"`
 }
 
-func TryParseToolCall(s string) (*ToolCall, bool) {
+func TryParseToolCall(s string) (ToolCall, bool) {
 	var tc ToolCall
 	if err := json.Unmarshal([]byte(s), &tc); err != nil {
-		return nil, false
+		return ToolCall{}, false
 	}
 	if tc.Tool == "" {
-		return nil, false
+		return ToolCall{}, false
 	}
-	return &tc, true
+	return tc, true
 }

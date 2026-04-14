@@ -12,10 +12,13 @@ type Input struct {
 	Provider   factory.ProviderOpts
 	SessionID  string
 	MaxHistory int
+	Debug      bool
 }
 
 func ParseFlags() (Input, error) {
 	model := flag.String("model", "", "model name")
+	debug := flag.Bool("debug", false, "debug mode without tui")
+
 	provider := flag.String("provider", "local", "provider: api | local")
 	providerName := flag.String("provider_name", "", "provider name like: deepseek, llamacpp")
 	sessionID := flag.String("session", "", "session ID for persistent chat")
@@ -45,5 +48,6 @@ func ParseFlags() (Input, error) {
 		},
 		SessionID:  *sessionID,
 		MaxHistory: *maxHistory,
+		Debug:      *debug,
 	}, nil
 }

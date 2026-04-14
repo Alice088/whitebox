@@ -1,13 +1,12 @@
 package tui
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
-	syscontext "whitebox/internal/core/context"
-	"whitebox/internal/core/tools"
+	"whitebox/internal/core"
+	"whitebox/internal/core/context"
+	"whitebox/pkg/colors"
 
 	"charm.land/bubbles/v2/cursor"
 	"charm.land/bubbles/v2/textarea"
@@ -23,12 +22,17 @@ var inlineCodeStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("255")).
 	Padding(0, 1)
 
-type answerMsg struct {
-	text string
-	err  error
+type eventsMsg struct {
+	events chan core.Event
+}
+
+type eventTickMsg struct {
+	event core.Event
+	ok    bool
 }
 
 type tuiModel struct {
+	program     *tea.Program // 🔥 ВАЖНО
 	chat        *Chat
 	viewport    viewport.Model
 	messages    []string
@@ -41,11 +45,9 @@ type tuiModel struct {
 
 func renderInlineCode(s string) string {
 	parts := strings.Split(s, "`")
-
 	for i := 1; i < len(parts); i += 2 {
 		parts[i] = inlineCodeStyle.Render(parts[i])
 	}
-
 	return strings.Join(parts, "")
 }
 
@@ -87,10 +89,9 @@ func renderCodeBlocks(input string) string {
 	return strings.Join(out, "\n")
 }
 
-func initialModel(chat *Chat, sessionID string) tuiModel {
+func initialModel(chat *Chat) tuiModel {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message..."
-	ta.SetVirtualCursor(false)
 	ta.Focus()
 
 	ta.Prompt = "┃ "
@@ -107,17 +108,12 @@ func initialModel(chat *Chat, sessionID string) tuiModel {
 
 	messages := []string{
 		"Whitebox Chat Mode",
-		fmt.Sprintf("Sessions ID: %s", sessionID),
+		fmt.Sprintf("Session ID: %s", chat.CoreEngine.Context.Sessions.ID),
 		"Type '@exit' to quit, '@clear' to clear history",
 	}
 
 	vp := viewport.New(viewport.WithWidth(30), viewport.WithHeight(5))
-
-	vp.SetContent(
-		lipgloss.NewStyle().
-			Width(30).
-			Render(strings.Join(messages, "\n")),
-	)
+	vp.SetContent(strings.Join(messages, "\n"))
 
 	return tuiModel{
 		chat:        chat,
@@ -129,45 +125,24 @@ func initialModel(chat *Chat, sessionID string) tuiModel {
 }
 
 func (m tuiModel) Init() tea.Cmd {
-	return tea.Batch(
-		textarea.Blink,
-		tickCmd(),
-	)
+	return tea.Batch(textarea.Blink, tickCmd())
 }
 
-func askCmd(chat *Chat, input string) tea.Cmd {
+func askCmd(p *tea.Program, chat *Chat, input string) tea.Cmd {
 	return func() tea.Msg {
-		out, err := chat.ask(context.Background(), input)
-		tc, ok := tools.TryParseToolCall(out)
-		if !ok {
-			return answerMsg{text: out, err: err}
-		}
-
-		chat.Logger.Info().Msg("Tool call request")
-
-		switch tc.Tool {
-		case "read_file":
-			chat.Logger.Info().Str("Tool", tc.Tool).Str("Path", tc.Arguments.Path).Msg("Tool call")
-
-			content, err := tools.ReadFile(tc.Arguments.Path)
-			if err != nil {
-				chat.Logger.Error().Err(err).Str("Tool", tc.Tool).Str("Path", tc.Arguments.Path).Msg("Tool call failed")
-				return answerMsg{text: out, err: err}
-			}
-
-			finalPrompt := fmt.Sprintf(`
-				User asked: %s
-				Tool read_file result:
-				%s
-				Now answer the user normally.
-				`, input, content)
-
-			out, err = chat.LLM.Ask(finalPrompt, chat.Context.Prompt())
-			chat.Logger.Info().Str("Tool", tc.Tool).Str("Path", tc.Arguments.Path).Str("Answer", out).Msg("Tool call answer")
-			return answerMsg{text: out, err: err}
-		}
-
-		return answerMsg{text: "", err: errors.New("invalid tool call")}
+		go func() {
+			_, _ = chat.CoreEngine.Run(input, func(e core.Event) {
+				p.Send(eventTickMsg{event: e, ok: true})
+			})
+			p.Send(eventTickMsg{ok: false})
+		}()
+		return nil
+	}
+}
+func nextEventCmd(ch chan core.Event) tea.Cmd {
+	return func() tea.Msg {
+		e, ok := <-ch
+		return eventTickMsg{event: e, ok: ok}
 	}
 }
 
@@ -184,7 +159,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case time.Time:
 		if m.loading {
-			m.status = m.chat.statusEngine.NextAnimated()
+			m.status = m.chat.StatusEngine.NextAnimated()
 			m.viewport.SetContent(m.renderContent())
 		}
 		return m, tickCmd()
@@ -205,39 +180,19 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			if input == "@exit" {
-				return m, tea.Quit
-			}
-
-			if input == "@clear" {
-				m.chat.Context.ClearMessages()
-				m.messages = m.messages[:3]
-				m.viewport.SetContent(m.renderContent())
-				m.textarea.Reset()
-				return m, nil
-			}
-
-			m.chat.Context.AddMessage(syscontext.Message{
+			m.messages = append(m.messages, m.senderStyle.Render("You: ")+input)
+			m.chat.CoreEngine.Context.AddMessage(context.Message{
 				Role:    "user",
 				Content: input,
 			})
-			m.chat.Context.TrimMessages(m.chat.Session.MaxMessages)
-
-			m.messages = append(m.messages,
-				m.senderStyle.Render("You: ")+input,
-			)
 
 			m.textarea.Reset()
 			m.loading = true
-			m.status = m.chat.statusEngine.NextAnimated()
 
 			m.viewport.SetContent(m.renderContent())
 			m.viewport.GotoBottom()
 
-			return m, tea.Batch(
-				askCmd(m.chat, input),
-				tickCmd(),
-			)
+			return m, askCmd(m.program, m.chat, input)
 
 		default:
 			var cmd tea.Cmd
@@ -249,35 +204,40 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmd, vpCmd)
 		}
 
-	case answerMsg:
-		m.loading = false
-		m.status = ""
+	case eventTickMsg:
+		if msg.ok {
+			switch msg.event.Type {
+			case "debug":
+				if m.chat.Debug {
+					m.messages = append(m.messages, "DEBUG: "+fmt.Sprint(msg.event.Data))
+				}
 
-		if msg.err != nil {
-			m.err = msg.err
-			return m, nil
+			case "llm_doing":
+				m.messages = append(m.messages, msg.event.Data.(string))
+
+			case "tool_call":
+				m.messages = append(m.messages, colors.Dim("TOOLS: "+msg.event.Data.(string)))
+
+			case "error":
+				m.messages = append(m.messages, "ERROR: "+msg.event.Data.(string))
+
+			case "final":
+				rendered := renderCodeBlocks(msg.event.Data.(string))
+				m.chat.CoreEngine.Context.AddMessage(context.Message{
+					Role:    "assistant",
+					Content: rendered,
+				})
+				m.messages = append(m.messages, "Assistant:\n"+rendered)
+				m.loading = false
+			}
+		} else {
+			m.loading = false
 		}
-
-		rendered := renderCodeBlocks(msg.text)
-		m.messages = append(m.messages, "Assistant:\n"+rendered)
 
 		m.viewport.SetContent(m.renderContent())
 		m.viewport.GotoBottom()
 
-		m.chat.Context.AddMessage(syscontext.Message{
-			Role:    "assistant",
-			Content: msg.text,
-		})
-		m.chat.Context.TrimMessages(m.chat.Session.MaxMessages)
-
-		if len(m.chat.Context.Messages) > 0 {
-			if err := m.chat.Session.SaveSession(m.chat.Context.Messages); err != nil {
-				m.err = err
-			}
-		}
-
 		return m, nil
-
 	case cursor.BlinkMsg:
 		var cmd tea.Cmd
 		m.textarea, cmd = m.textarea.Update(msg)
@@ -288,9 +248,15 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m tuiModel) View() tea.View {
-	viewportView := m.viewport.View()
+	divider := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Render(strings.Repeat("─", m.viewport.Width()))
 
-	out := viewportView + "\n" + m.textarea.View()
+	input := lipgloss.NewStyle().
+		MarginTop(1).
+		Render(m.textarea.View())
+
+	out := m.viewport.View() + "\n" + divider + "\n" + input
 
 	if m.err != nil {
 		out += "\nerror: " + m.err.Error()
@@ -300,8 +266,9 @@ func (m tuiModel) View() tea.View {
 
 	c := m.textarea.Cursor()
 	if c != nil {
-		c.Y += lipgloss.Height(viewportView)
+		c.Y += lipgloss.Height(m.viewport.View()) + 2 // 🔥 важно
 	}
+
 	v.Cursor = c
 	v.AltScreen = true
 

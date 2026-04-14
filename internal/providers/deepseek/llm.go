@@ -70,7 +70,7 @@ func (d DeepSeek) Ask(prompt, systemPrompt string) (string, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("status code is %s(%d): %s", resp.Status, resp.StatusCode, string(body))
+		return "", fmt.Errorf("status code is %s: %s", resp.Status, string(body))
 	}
 
 	var response http2.ResponseBody

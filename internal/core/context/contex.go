@@ -1,20 +1,34 @@
 package context
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 )
 
+func mustBaseDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+	return filepath.Join(home, ".whitebox", "context")
+}
+
+var (
+	BaseDir     = mustBaseDir()
+	ToolsDir    = filepath.Join(BaseDir, "tools")
+	SkillsDir   = filepath.Join(BaseDir, "skills")
+	MemoriesDir = filepath.Join(BaseDir, "memories")
+	MindsDir    = filepath.Join(BaseDir, "minds")
+	SessionsDir = filepath.Join(BaseDir, "sessions")
+)
+
 type Context struct {
-	Messages []Message
+	Sessions Sessions
 	Tools    []Item
 	Skills   []Item
-	Memory   []Item
-	Mind     []Item
-
-	staticPrompt   string
-	messagesPrompt string
-	staticValid    bool
-	messagesValid  bool
+	Memories []Item
+	Minds    []Item
 }
 
 type Item struct {
@@ -22,32 +36,14 @@ type Item struct {
 	Content string
 }
 
-type CollectOpts struct {
-	MemoryPath   string
-	SkillsPath   string
-	ToolsPath    string
-	MessagesPath string
-	MindPath     string
-}
-
 func (c *Context) Prompt() string {
-	c.buildStatic()
-	c.buildMessages()
-	return c.staticPrompt + c.messagesPrompt
-}
-
-func (c *Context) buildStatic() {
-	if c.staticValid {
-		return
-	}
-
 	var builder strings.Builder
 
-	for _, item := range c.Mind {
+	for _, item := range c.Minds {
 		builder.WriteString(item.Content)
 	}
 
-	for _, item := range c.Memory {
+	for _, item := range c.Memories {
 		builder.WriteString(item.Content)
 	}
 
@@ -59,87 +55,45 @@ func (c *Context) buildStatic() {
 		builder.WriteString(item.Content)
 	}
 
-	c.staticPrompt = builder.String()
-	c.staticValid = true
-}
-
-func (c *Context) buildMessages() {
-	if c.messagesValid {
-		return
-	}
-
-	var builder strings.Builder
-
-	for _, msg := range c.Messages {
+	for _, msg := range c.Sessions.Messages {
 		builder.WriteString("\n")
 		builder.WriteString(msg.Role)
 		builder.WriteString(": ")
 		builder.WriteString(msg.Content)
 	}
 
-	c.messagesPrompt = builder.String()
-	c.messagesValid = true
+	return builder.String()
 }
 
-func (c *Context) AddMessage(msg Message) {
-	c.Messages = append(c.Messages, msg)
-	c.messagesValid = false
+func (c *Context) ClearMessages() error {
+	c.Sessions.Messages = []Message{}
+	return c.Sessions.SaveSession([]Message{})
 }
 
-func (c *Context) ClearMessages() {
-	c.Messages = []Message{}
-	c.messagesPrompt = ""
-	c.messagesValid = false
+func (c *Context) AddMessage(msg Message) error {
+	c.Sessions.Messages = append(c.Sessions.Messages, msg)
+	return c.Sessions.SaveSession(c.Sessions.Messages)
 }
 
-func (c *Context) TrimMessages(max int) {
-	if len(c.Messages) > max {
-		c.Messages = c.Messages[len(c.Messages)-max:]
-		c.messagesValid = false
-	}
-}
-
-func (c *Context) SetMind(items []Item) {
-	c.Mind = items
-	c.staticValid = false
-}
-
-func (c *Context) SetMemory(items []Item) {
-	c.Memory = items
-	c.staticValid = false
-}
-
-func (c *Context) SetSkills(items []Item) {
-	c.Skills = items
-	c.staticValid = false
-}
-
-func (c *Context) SetTools(items []Item) {
-	c.Tools = items
-	c.staticValid = false
-}
-
-func (c *Context) Collect(opts CollectOpts) error {
-	c.staticValid = false
-	c.messagesValid = false
+func (c *Context) Collect() error {
 	var err error
 
-	c.Mind, err = load(opts.MindPath)
+	c.Minds, err = load(MindsDir)
 	if err != nil {
 		return err
 	}
 
-	c.Memory, err = load(opts.MemoryPath)
+	c.Memories, err = load(MemoriesDir)
 	if err != nil {
 		return err
 	}
 
-	c.Skills, err = load(opts.SkillsPath)
+	c.Skills, err = load(SkillsDir)
 	if err != nil {
 		return err
 	}
 
-	c.Tools, err = load(opts.ToolsPath)
+	c.Tools, err = load(ToolsDir)
 	if err != nil {
 		return err
 	}

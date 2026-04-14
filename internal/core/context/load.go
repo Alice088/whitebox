@@ -1,6 +1,7 @@
 package context
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -29,7 +30,7 @@ func load(dir string) ([]Item, error) {
 
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to context file: %w", err)
 		}
 
 		items = append(items, Item{
@@ -40,5 +41,9 @@ func load(dir string) ([]Item, error) {
 		return nil
 	})
 
-	return items, err
+	if err != nil {
+		return items, fmt.Errorf("failed to walk on dir: %w", err)
+	}
+
+	return items, nil
 }

@@ -2,24 +2,29 @@ package context
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"whitebox/internal/config"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
-type Session struct {
-	Logger      zerolog.Logger
+type Sessions struct {
+	Messages    []Message
 	ID          string
-	Path        string
 	MaxMessages int
 }
 
-func NewSession(ID string, max int, logger zerolog.Logger) Session {
-	s := Session{
-		Logger:      logger,
-		MaxMessages: max,
+type Message struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+func NewSession(ID string, config config.Session) Sessions {
+	s := Sessions{
+		MaxMessages: config.MaxMessages,
 	}
 
 	if ID != "" {
@@ -28,35 +33,31 @@ func NewSession(ID string, max int, logger zerolog.Logger) Session {
 		s.ID = uuid.NewString()
 	}
 
-	s.CreateSessionDir()
 	return s
 }
 
-func (s *Session) MustLoadMessages() []Message {
-	data, err := os.ReadFile(s.Path)
+func (s *Sessions) MustLoadMessages(logger *zerolog.Logger) {
+	data, err := os.ReadFile(s.Path())
 	if err != nil {
 		if os.IsNotExist(err) {
-			return []Message{}
+			return
 		}
-		s.Logger.Fatal().Err(err).Msg("Failed to load session")
+		logger.Fatal().Err(err).Msg("Failed to load session")
 	}
 
-	var msgs []Message
-	err = json.Unmarshal(data, &msgs)
+	err = json.Unmarshal(data, &s.Messages)
 	if err != nil {
-		s.Logger.Fatal().Err(err).Msg("Failed to unmarshal messages")
+		logger.Fatal().Err(err).Msg("Failed to unmarshal messages")
 	}
 
-	s.Logger.Info().
+	logger.Info().
 		Str("session_id", s.ID).
-		Int("loaded_messages", len(msgs)).
+		Int("loaded_messages", len(s.Messages)).
 		Msg("session loaded")
-
-	return msgs
 }
 
-func (s *Session) SaveSession(msgs []Message) error {
-	dir := filepath.Dir(s.Path)
+func (s *Sessions) SaveSession(msgs []Message) error {
+	dir := filepath.Dir(s.Path())
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -66,19 +67,16 @@ func (s *Session) SaveSession(msgs []Message) error {
 		return err
 	}
 
-	return os.WriteFile(s.Path, data, 0644)
+	return os.WriteFile(s.Path(), data, 0644)
 }
 
-func (s *Session) CreateSessionDir(path ...string) {
-	sessionsDir := "context/sessions"
-	if len(path) != 0 {
-		sessionsDir = path[0]
+func (s *Sessions) CreateSessionDir() error {
+	if err := os.MkdirAll(SessionsDir, 0755); err != nil {
+		return err
 	}
+	return nil
+}
 
-	if err := os.MkdirAll(sessionsDir, 0755); err != nil {
-		s.Logger.Fatal().Err(err).Msg("failed to create sessions directory")
-	}
-
-	s.Path = filepath.Join(sessionsDir, s.ID+".json")
-	return
+func (s *Sessions) Path() string {
+	return fmt.Sprintf("%s/%s.json", SessionsDir, s.ID)
 }
