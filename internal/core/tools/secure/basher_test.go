@@ -1,95 +1,159 @@
 package secure
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
-	"strings"
-	"whitebox/internal/paths"
+	"testing"
 )
 
-type Basher struct {
-	Blacklist []*regexp.Regexp
-	Whitelist []*regexp.Regexp
-	enabled   bool
+func setupStrictBasher() {
+	Basherx = Basher{
+		enabled: true,
+		Whitelist: []*regexp.Regexp{
+			regexp.MustCompile(`^ls(\s|$)`),
+			regexp.MustCompile(`^echo(\s|$)`),
+			regexp.MustCompile(`^mkdir(\s+[a-zA-Z0-9_./-]+)+$`),
+		},
+		Blacklist: []*regexp.Regexp{
+			regexp.MustCompile(`rm\s+-`),
+			regexp.MustCompile(`;`),
+			regexp.MustCompile(`&`),
+			regexp.MustCompile(`\|`),
+			regexp.MustCompile(`\$\(`),
+			regexp.MustCompile("`"),
+			regexp.MustCompile(`\.\./`),
+			regexp.MustCompile(`^/`),
+		},
+	}
 }
 
-func Command(cmd string) error {
-	if !Basherx.enabled {
-		return nil
-	}
+func TestAllowedCommand(t *testing.T) {
+	setupStrictBasher()
 
-	cmd = strings.TrimSpace(cmd)
-
-	if cmd == "" {
-		return fmt.Errorf("empty command")
+	if err := Command("ls -la"); err != nil {
+		t.Fatalf("expected allowed, got error: %v", err)
 	}
-
-	// 1. проверка whitelist
-	allowed := false
-	for _, r := range Basherx.Whitelist {
-		if r.MatchString(cmd) {
-			allowed = true
-			break
-		}
-	}
-	if !allowed {
-		return fmt.Errorf("command not allowed")
-	}
-
-	// 2. проверка blacklist
-	for _, r := range Basherx.Blacklist {
-		if r.MatchString(cmd) {
-			return fmt.Errorf("command blocked: unsecure pattern: %s", r.String())
-		}
-	}
-
-	return nil
 }
 
-type RawBasher struct {
-	Blacklist []string `json:"blacklist"`
-	Whitelist []string `json:"whitelist"`
+func TestRejectUnknownCommand(t *testing.T) {
+	setupStrictBasher()
+
+	if err := Command("pwd"); err == nil {
+		t.Fatalf("expected rejection for non-whitelisted command")
+	}
 }
 
-func (rb RawBasher) compile(patterns []string) ([]*regexp.Regexp, error) {
-	var result []*regexp.Regexp
+func TestRejectSemicolonInjection(t *testing.T) {
+	setupStrictBasher()
 
-	for _, p := range patterns {
-		r, err := regexp.Compile(p)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, r)
+	err := Command("ls; rm -rf /")
+	if err == nil {
+		t.Fatalf("semicolon injection passed")
 	}
-
-	return result, nil
 }
 
-var Basherx Basher
+func TestRejectAndOperator(t *testing.T) {
+	setupStrictBasher()
 
-func init() {
-	raw, err := os.ReadFile(filepath.Join(paths.CommandsDir, "rules.json"))
-	if err != nil {
-		Basherx.enabled = false
-		return
+	err := Command("ls && echo hi")
+	if err == nil {
+		t.Fatalf("&& bypass passed")
 	}
-	Basherx.enabled = true
+}
 
-	var rules RawBasher
-	err = json.Unmarshal(raw, &rules)
-	if err != nil {
-		panic("failed to parse commands/rules: " + err.Error())
-	}
+func TestRejectPipe(t *testing.T) {
+	setupStrictBasher()
 
-	Basherx.Whitelist, err = rules.compile(rules.Whitelist)
-	if err != nil {
-		panic("failed to compile whitelist rules.json: " + err.Error())
+	err := Command("ls | cat")
+	if err == nil {
+		t.Fatalf("pipe bypass passed")
 	}
-	Basherx.Blacklist, err = rules.compile(rules.Blacklist)
+}
+
+func TestRejectSubshell(t *testing.T) {
+	setupStrictBasher()
+
+	err := Command("echo $(whoami)")
+	if err == nil {
+		t.Fatalf("$() bypass passed")
+	}
+}
+
+func TestRejectBackticks(t *testing.T) {
+	setupStrictBasher()
+
+	err := Command("echo `whoami`")
+	if err == nil {
+		t.Fatalf("backtick bypass passed")
+	}
+}
+
+func TestRejectTraversal(t *testing.T) {
+	setupStrictBasher()
+
+	err := Command("cat ../secret.txt")
+	if err == nil {
+		t.Fatalf("path traversal passed")
+	}
+}
+
+func TestRejectAbsolutePath(t *testing.T) {
+	setupStrictBasher()
+
+	err := Command("cat /etc/passwd")
+	if err == nil {
+		t.Fatalf("absolute path passed")
+	}
+}
+
+func TestUnicodeBypass(t *testing.T) {
+	setupStrictBasher()
+
+	// похожий на ; символ
+	err := Command("ls ؛ rm -rf /")
+	if err == nil {
+		t.Fatalf("unicode bypass passed")
+	}
+}
+
+func TestWeirdSpacing(t *testing.T) {
+	setupStrictBasher()
+
+	err := Command("ls    -la")
 	if err != nil {
-		panic("failed to compile blacklist rules.json: " + err.Error())
+		t.Fatalf("valid command broken: %v", err)
+	}
+}
+
+func TestEmptyCommand(t *testing.T) {
+	setupStrictBasher()
+
+	if err := Command(""); err == nil {
+		t.Fatalf("empty command should fail")
+	}
+}
+
+func TestDisabledMode(t *testing.T) {
+	Basherx = Basher{enabled: false}
+
+	if err := Command("rm -rf /"); err != nil {
+		t.Fatalf("disabled mode should allow everything")
+	}
+}
+
+func TestTraversalHidden(t *testing.T) {
+	setupStrictBasher()
+
+	err := Command("mkdir a/../../etc")
+	if err == nil {
+		t.Fatalf("path traversal via mkdir passed")
+	}
+}
+
+func TestEchoAbuse(t *testing.T) {
+	setupStrictBasher()
+
+	err := Command("echo rm -rf /")
+	if err == nil {
+		t.Fatalf("expected echo with dangerous content to be blocked")
 	}
 }

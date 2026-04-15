@@ -2,10 +2,12 @@ package core
 
 import (
 	"fmt"
+	"strings"
 	"time"
 	"whitebox/internal/core/context"
 	"whitebox/internal/core/llm"
 	"whitebox/internal/core/tools"
+	"whitebox/internal/langfuse"
 	"whitebox/pkg/messages"
 )
 
@@ -17,6 +19,13 @@ type Engine struct {
 
 func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 	state := &State{Input: input, Task: input}
+	if w, ok := e.LLM.(*langfuse.LLMWrapper); ok {
+		err := w.StartTrace(input)
+		if err != nil {
+			return "", fmt.Errorf("failed to start trace: %w", err)
+		}
+		defer w.EndTrace()
+	}
 
 	for i := 0; i < e.CallChain.Max; i++ {
 		emit(Event{"debug", fmt.Sprintf("loop start (i=%d)", i+1)})
@@ -28,19 +37,21 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 		emit(Event{"debug", fmt.Sprintf("got response from LLM (%s)", time.Since(t).String())})
 
 		if err != nil {
-			emit(Event{"error", fmt.Sprintf("Error!: [%v]", err)})
+			emit(Event{"error", fmt.Sprintf("ASK_ERR: %v", err)})
 			return "", err
 		}
 		emit(Event{"debug", fmt.Sprintf("LLM OUTPUT: [%s]", out)})
 
 		if tc, ok := tools.IsToolCall(out); ok {
-			result, err := tools.Execute(tc)
-			emit(Event{"tool_call", fmt.Sprintf("%s (%+v) \n - %s", tc.Tool, messages.LimitArgs(tc.Arguments, 40), messages.OutputLimit(result, 100))})
+			result, err := e.LLM.Tool(tc)
+			result = strings.TrimSpace(result)
+
+			emit(Event{"tool_call", fmt.Sprintf("%s (%+v) \n - %s", tc.Tool, messages.LimitArgs(tc.Arguments, 2), messages.OutputLimit(result, 2))})
 			state.History += fmt.Sprintf(`
 						- Tool: %s
 						  Args: %+v
 						  Result: %s
-						  Error(if exists): %v
+						  Error: %v
 			`, tc.Tool, tc.Arguments, result, err)
 
 			if err != nil {

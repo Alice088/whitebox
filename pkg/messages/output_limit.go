@@ -2,15 +2,16 @@ package messages
 
 import (
 	"fmt"
+	"strings"
 )
 
 func OutputLimit(str string, limit int) string {
-	runes := []rune(str)
+	lines := strings.Split(str, "\n")
 
-	if len(runes) > limit {
-		visible := string(runes[:limit])
-		rest := len(runes) - limit
-		return fmt.Sprintf("%s...[+%d]", visible, rest)
+	if len(lines) > limit {
+		visible := strings.Join(lines[:limit], "\n")
+		rest := len(lines) - limit
+		return fmt.Sprintf("%s\n...[+%d lines]", visible, rest)
 	}
 
 	return str

@@ -1,54 +1,155 @@
 package secure
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"testing"
 	"whitebox/internal/paths"
 )
 
-func Path(path string) (string, error) {
-	if path == "" {
-		return "", fmt.Errorf("empty path")
-	}
-
-	// запрещаем абсолютные пути
-	if filepath.IsAbs(path) {
-		return "", fmt.Errorf("absolute paths not allowed")
-	}
-
-	// собираем полный путь
-	fullPath := filepath.Join(paths.WorkspaceDir, path)
-	cleanPath := filepath.Clean(fullPath)
-
-	// проверка выхода через ../
-	rel, err := filepath.Rel(paths.WorkspaceDir, cleanPath)
+func setupWorkspace(t *testing.T) string {
+	dir, err := os.MkdirTemp("", "secure_test")
 	if err != nil {
-		return "", fmt.Errorf("invalid path")
+		t.Fatal(err)
 	}
-	if strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("access denied")
-	}
+	paths.WorkspaceDir = dir
+	return dir
+}
 
-	// резолвим symlink
-	realPath, err := filepath.EvalSymlinks(cleanPath)
+func TestPath_Empty(t *testing.T) {
+	setupWorkspace(t)
+
+	_, err := Path("")
+	if err == nil {
+		t.Fatalf("expected error for empty path")
+	}
+}
+
+func TestPath_Absolute(t *testing.T) {
+	setupWorkspace(t)
+
+	_, err := Path("/etc/passwd")
+	if err == nil {
+		t.Fatalf("absolute path should be rejected")
+	}
+}
+
+func TestPath_Valid(t *testing.T) {
+	dir := setupWorkspace(t)
+
+	p, err := Path("file.txt")
 	if err != nil {
-		// если файл еще не существует (write_file) — это нормально
-		if !os.IsNotExist(err) {
-			return "", err
-		}
-		realPath = cleanPath
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// повторная проверка после symlink
-	rel, err = filepath.Rel(paths.WorkspaceDir, realPath)
+	expected := filepath.Join(dir, "file.txt")
+	if p != expected {
+		t.Fatalf("expected %s, got %s", expected, p)
+	}
+}
+
+func TestPath_Traversal(t *testing.T) {
+	setupWorkspace(t)
+
+	_, err := Path("../secret.txt")
+	if err == nil {
+		t.Fatalf("path traversal should be rejected")
+	}
+}
+
+func TestPath_NestedTraversal(t *testing.T) {
+	setupWorkspace(t)
+
+	_, err := Path("a/../../etc/passwd")
+	if err == nil {
+		t.Fatalf("nested traversal should be rejected")
+	}
+}
+
+func TestPath_CleanTraversal(t *testing.T) {
+	setupWorkspace(t)
+
+	_, err := Path("a/../b/../../etc")
+	if err == nil {
+		t.Fatalf("clean traversal should be rejected")
+	}
+}
+
+func TestPath_SymlinkEscape(t *testing.T) {
+	dir := setupWorkspace(t)
+
+	outsideDir, err := os.MkdirTemp("", "outside")
 	if err != nil {
-		return "", fmt.Errorf("invalid path")
-	}
-	if strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("access denied (symlink)")
+		t.Fatal(err)
 	}
 
-	return realPath, nil
+	target := filepath.Join(outsideDir, "file.txt")
+	if err := os.WriteFile(target, []byte("data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = Path("link")
+	if err == nil {
+		t.Fatalf("symlink escape should be rejected")
+	}
+}
+
+func TestPath_SymlinkInside(t *testing.T) {
+	dir := setupWorkspace(t)
+
+	target := filepath.Join(dir, "real.txt")
+	if err := os.WriteFile(target, []byte("ok"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Path("link")
+	if err != nil {
+		t.Fatalf("valid symlink inside workspace should pass: %v", err)
+	}
+}
+
+func TestPath_NonExistent(t *testing.T) {
+	setupWorkspace(t)
+
+	_, err := Path("newfile.txt")
+	if err != nil {
+		t.Fatalf("non-existent file should be allowed: %v", err)
+	}
+}
+
+func TestPath_Dot(t *testing.T) {
+	dir := setupWorkspace(t)
+
+	p, err := Path(".")
+	if err != nil {
+		t.Fatalf("dot path should pass: %v", err)
+	}
+
+	if p != dir {
+		t.Fatalf("expected workspace dir, got %s", p)
+	}
+}
+
+func TestPath_DoubleSlash(t *testing.T) {
+	dir := setupWorkspace(t)
+
+	p, err := Path("a//b//c.txt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := filepath.Join(dir, "a/b/c.txt")
+	if p != expected {
+		t.Fatalf("expected %s, got %s", expected, p)
+	}
 }

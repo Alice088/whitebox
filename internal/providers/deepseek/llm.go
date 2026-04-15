@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"whitebox/internal/core/tools"
 
 	"whitebox/internal/core/llm"
 	http2 "whitebox/internal/http"
@@ -30,6 +31,10 @@ func New(opts providers.InitOpts) llm.LLM {
 		apiKey:  opts.ApiKey,
 		model:   opts.Model,
 	}
+}
+
+func (d DeepSeek) Tool(call tools.ToolCall) (string, error) {
+	return tools.Execute(call)
 }
 
 func (d DeepSeek) Ask(prompt, systemPrompt string) (string, error) {

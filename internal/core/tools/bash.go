@@ -1,13 +1,16 @@
 package tools
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 	"whitebox/internal/core/tools/secure"
 	"whitebox/internal/paths"
 	"whitebox/pkg/maps"
+	"whitebox/pkg/sys"
 )
 
 // Bash - fields: command
@@ -25,8 +28,12 @@ func Bash(arguments map[string]string) (string, error) {
 		return "", errors.New("invalid command")
 	}
 
-	cmd := exec.Command(parts[0], parts[1:]...)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
 	cmd.Dir = paths.WorkspaceDir
+	sys.SetSysProcAttr(cmd)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

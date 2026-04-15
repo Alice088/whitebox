@@ -5,6 +5,7 @@ import (
 	syscontext "whitebox/internal/core/context"
 	"whitebox/internal/factory"
 	"whitebox/internal/flag"
+	"whitebox/internal/langfuse"
 	"whitebox/internal/providers"
 	"whitebox/internal/tui"
 	"whitebox/pkg/cfg"
@@ -46,6 +47,12 @@ func main() {
 	})
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to init LLM")
+	}
+
+	if config.Observability.LangFuse.Enabled {
+		llm = &langfuse.LLMWrapper{
+			LLM: llm,
+		}
 	}
 
 	engine := core.Engine{

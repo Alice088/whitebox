@@ -6,15 +6,23 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"whitebox/internal/paths"
 )
 
 type Basher struct {
 	Blacklist []*regexp.Regexp
 	Whitelist []*regexp.Regexp
+	enabled   bool
 }
 
 func Command(cmd string) error {
+	if !Basherx.enabled {
+		return nil
+	}
+
+	cmd = strings.TrimSpace(cmd)
+
 	if cmd == "" {
 		return fmt.Errorf("empty command")
 	}
@@ -34,7 +42,7 @@ func Command(cmd string) error {
 	// 2. проверка blacklist
 	for _, r := range Basherx.Blacklist {
 		if r.MatchString(cmd) {
-			return fmt.Errorf("command blocked: unsecure patter: %s", r.String())
+			return fmt.Errorf("command blocked: unsecure pattern: %s", r.String())
 		}
 	}
 
@@ -65,8 +73,10 @@ var Basherx Basher
 func init() {
 	raw, err := os.ReadFile(filepath.Join(paths.CommandsDir, "rules.json"))
 	if err != nil {
+		Basherx.enabled = false
 		return
 	}
+	Basherx.enabled = true
 
 	var rules RawBasher
 	err = json.Unmarshal(raw, &rules)
@@ -75,5 +85,11 @@ func init() {
 	}
 
 	Basherx.Whitelist, err = rules.compile(rules.Whitelist)
+	if err != nil {
+		panic("failed to compile whitelist rules.json: " + err.Error())
+	}
 	Basherx.Blacklist, err = rules.compile(rules.Blacklist)
+	if err != nil {
+		panic("failed to compile blacklist rules.json: " + err.Error())
+	}
 }
