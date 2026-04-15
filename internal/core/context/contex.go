@@ -5,12 +5,25 @@ import (
 	"whitebox/internal/paths"
 )
 
-type Context struct {
-	Sessions Sessions
+type Context interface {
+	Prompt() string
+	ClearMessages() error
+	AddMessage(msg Message) error
+	Collect() error
+}
+
+type Default struct {
+	Sessions Session
 	Tools    []Item
 	Skills   []Item
 	Memories []Item
 	Minds    []Item
+}
+
+func New(session Session) Context {
+	return &Default{
+		Sessions: session,
+	}
 }
 
 type Item struct {
@@ -18,7 +31,7 @@ type Item struct {
 	Content string
 }
 
-func (c *Context) Prompt() string {
+func (c *Default) Prompt() string {
 	var builder strings.Builder
 
 	for _, item := range c.Minds {
@@ -47,17 +60,17 @@ func (c *Context) Prompt() string {
 	return builder.String()
 }
 
-func (c *Context) ClearMessages() error {
+func (c *Default) ClearMessages() error {
 	c.Sessions.Messages = []Message{}
 	return c.Sessions.SaveSession([]Message{})
 }
 
-func (c *Context) AddMessage(msg Message) error {
+func (c *Default) AddMessage(msg Message) error {
 	c.Sessions.Messages = append(c.Sessions.Messages, msg)
 	return c.Sessions.SaveSession(c.Sessions.Messages)
 }
 
-func (c *Context) Collect() error {
+func (c *Default) Collect() error {
 	var err error
 
 	c.Minds, err = load(paths.MindsDir)

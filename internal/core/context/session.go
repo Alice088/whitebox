@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type Sessions struct {
+type Session struct {
 	Messages    []Message
 	ID          string
 	MaxMessages int
@@ -23,8 +23,8 @@ type Message struct {
 	Content string `json:"content"`
 }
 
-func NewSession(ID string, config config.Session) Sessions {
-	s := Sessions{
+func NewSession(ID string, config config.Session) Session {
+	s := Session{
 		MaxMessages: config.MaxMessages,
 	}
 
@@ -37,7 +37,7 @@ func NewSession(ID string, config config.Session) Sessions {
 	return s
 }
 
-func (s *Sessions) MustLoadMessages(logger *zerolog.Logger) {
+func (s *Session) MustLoadMessages(logger *zerolog.Logger) {
 	data, err := os.ReadFile(s.Path())
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -57,7 +57,7 @@ func (s *Sessions) MustLoadMessages(logger *zerolog.Logger) {
 		Msg("session loaded")
 }
 
-func (s *Sessions) SaveSession(msgs []Message) error {
+func (s *Session) SaveSession(msgs []Message) error {
 	dir := filepath.Dir(s.Path())
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
@@ -71,13 +71,13 @@ func (s *Sessions) SaveSession(msgs []Message) error {
 	return os.WriteFile(s.Path(), data, 0644)
 }
 
-func (s *Sessions) CreateSessionDir() error {
+func (s *Session) CreateSessionDir() error {
 	if err := os.MkdirAll(paths.SessionsDir, 0755); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *Sessions) Path() string {
+func (s *Session) Path() string {
 	return fmt.Sprintf("%s/%s.json", paths.SessionsDir, s.ID)
 }

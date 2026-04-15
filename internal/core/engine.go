@@ -13,7 +13,7 @@ import (
 
 type Engine struct {
 	LLM       llm.LLM
-	Context   *context.Context
+	Context   context.Context
 	CallChain CallChain
 }
 

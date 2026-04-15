@@ -32,10 +32,7 @@ func main() {
 	}
 	session.MustLoadMessages(&logger)
 
-	systemContext := syscontext.Context{
-		Sessions: session,
-	}
-
+	systemContext := syscontext.New(session)
 	err = systemContext.Collect()
 	if err != nil {
 		logger.Fatal().Err(err).Send()
@@ -57,7 +54,7 @@ func main() {
 
 	engine := core.Engine{
 		LLM:     llm,
-		Context: &systemContext,
+		Context: systemContext,
 		CallChain: core.CallChain{
 			Max: config.CallChain.Max,
 		},
