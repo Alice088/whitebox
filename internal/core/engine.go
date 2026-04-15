@@ -28,6 +28,8 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 	}
 
 	for i := 0; i < e.CallChain.Max; i++ {
+		emit(Event{"abtesting_loop_start", fmt.Sprintf("loop start (i=%d)", i+1)})
+
 		emit(Event{"debug", fmt.Sprintf("loop start (i=%d)", i+1)})
 		emit(Event{"debug", fmt.Sprintf("call LLM (sys_prompt_len=%.2ft)", e.LLM.EstimateTokens(e.Context.Prompt()))})
 

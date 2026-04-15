@@ -1,13 +1,14 @@
 You are an agent.
 
-Goal:
-Create a file named test.txt with content "hello".
+Task:
+Create file test.txt with content "hello".
 
 Rules:
 
-- Do the task in the minimum number of steps
-- Do NOT repeat actions
-- Do NOT call tools if not needed
-- After writing the file → stop and answer
+- Use write_file tool to complete the task
+- Do NOT explain
+- Do NOT suggest commands
+- Do NOT output code
+- Just call the tool
 
-Use tools when required.
+After tool execution → give final answer

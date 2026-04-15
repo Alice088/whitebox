@@ -44,12 +44,12 @@ func main() {
 		{
 			Name:   "nice prompt: v1",
 			Input:  "create file test.txt",
-			Prompt: load("./testing/abtest/prompts/files/example_v1.md"),
+			Prompt: plusBase(load("./testing/abtest/prompts/files/example_v1.md")),
 		},
 		{
 			Name:   "bad prompt: v2",
 			Input:  "create file test.txt",
-			Prompt: load("./testing/abtest/prompts/files/example_v2.md"),
+			Prompt: plusBase(load("./testing/abtest/prompts/files/example_v2.md")),
 		},
 	}
 
@@ -57,6 +57,10 @@ func main() {
 	results := runner.RunBatch(cases)
 
 	prompts.PrintReport(results)
+}
+
+func plusBase(prompt string) string {
+	return load("./testing/abtest/prompts/files/base.md") + prompt
 }
 
 func load(path string) string {
