@@ -1,6 +1,9 @@
-package prompts
+package abtest
 
-import "time"
+import (
+	"time"
+	"whitebox/internal/core/tools"
+)
 
 type Case struct {
 	Name   string
@@ -9,11 +12,12 @@ type Case struct {
 }
 
 type Metrics struct {
-	EventCalls int
-	Steps      int
-	ToolCalls  int
-	Errors     int
-	Duration   time.Duration
+	EventCalls        int
+	Steps             int
+	ToolsCalls        map[string]int
+	ToolsCallsHistory []tools.ToolCall
+	Errors            int
+	Duration          time.Duration
 }
 
 type Result struct {

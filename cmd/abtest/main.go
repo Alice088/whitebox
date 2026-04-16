@@ -6,6 +6,7 @@ import (
 	"whitebox/internal/factory"
 	"whitebox/internal/providers"
 	"whitebox/pkg/cfg"
+	"whitebox/testing/abtest"
 	"whitebox/testing/abtest/prompts"
 
 	"github.com/rs/zerolog"
@@ -40,7 +41,7 @@ func main() {
 		Logger: &logger,
 	}
 
-	cases := []prompts.Case{
+	cases := []abtest.Case{
 		{
 			Name:   "nice prompt: v1",
 			Input:  "create file test.txt",

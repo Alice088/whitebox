@@ -4,6 +4,8 @@ import (
 	"strings"
 	"time"
 	"whitebox/internal/core"
+	"whitebox/internal/core/tools"
+	"whitebox/pkg/maps"
 	"whitebox/pkg/messages"
 	"whitebox/testing/abtest"
 
@@ -19,11 +21,12 @@ func trimSpace(str string) string {
 	return strings.ReplaceAll(strings.TrimSpace(str), "\n", " ")
 }
 
-func (r *Runner) RunCase(c Case) Result {
+func (r *Runner) RunCase(c abtest.Case) abtest.Result {
 	r.Logger.Info().Str("sys_prompt", trimSpace(messages.OutputLimit(c.Prompt, 5))).Msg("Mocking context")
 	r.Engine.Context = abtest.NewContext(c.Prompt)
 
-	var metrics Metrics
+	var metrics abtest.Metrics
+	metrics.ToolsCalls = make(map[string]int)
 	start := time.Now()
 	r.Logger.Info().Msg("Run engine")
 	out, err := r.Engine.Run(c.Input, func(e core.Event) {
@@ -34,8 +37,16 @@ func (r *Runner) RunCase(c Case) Result {
 		}
 
 		switch e.Type {
-		case "tool_call":
-			metrics.ToolCalls++
+		case "abtesting_tool_call":
+			tc := e.Data.(tools.ToolCall)
+
+			metrics.ToolsCallsHistory = append(metrics.ToolsCallsHistory, tc)
+
+			if maps.Exists(metrics.ToolsCalls, tc.Tool) {
+				metrics.ToolsCalls[tc.Tool]++
+			} else {
+				metrics.ToolsCalls[tc.Tool] = 1
+			}
 		case "abtesting_loop_start":
 			metrics.Steps++
 		case "error":
@@ -47,7 +58,7 @@ func (r *Runner) RunCase(c Case) Result {
 	metrics.Duration = end
 	r.Logger.Info().Str("Duration", end.String()).Msg("End engine")
 
-	return Result{
+	return abtest.Result{
 		Name:    c.Name,
 		Output:  out,
 		Error:   err,
@@ -55,8 +66,8 @@ func (r *Runner) RunCase(c Case) Result {
 	}
 }
 
-func (r *Runner) RunBatch(cases []Case) []Result {
-	var results []Result
+func (r *Runner) RunBatch(cases []abtest.Case) []abtest.Result {
+	var results []abtest.Result
 
 	for _, c := range cases {
 		r.Logger.Info().Str("name", c.Name).Msg("Run case")

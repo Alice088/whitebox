@@ -48,6 +48,7 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 			result, err := e.LLM.Tool(tc)
 			result = strings.TrimSpace(result)
 
+			emit(Event{"abtesting_tool_call", tc})
 			emit(Event{"tool_call", fmt.Sprintf("%s (%+v) \n - %s", tc.Tool, messages.LimitArgs(tc.Arguments, 2), messages.OutputLimit(result, 2))})
 			state.History += fmt.Sprintf(`
 						- Tool: %s
@@ -83,10 +84,10 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 						
 						Rules:
 						
-						1. If the task is already completed — give final answer.
-						2. Do NOT repeat the same action if it already succeeded.
-						3. Only call a tool if new information or action is required.
-						4. If no further action is needed — respond with final answer.
+						Continue solving the task.
+						
+						If more actions are needed, call another tool.
+						If task is complete, give final answer.
 						
 						Decide your next step.
 					`, state.Task, state.History, tc.Tool, result) //todo это тоже в контекст перенести
