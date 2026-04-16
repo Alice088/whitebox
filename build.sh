@@ -20,7 +20,7 @@ build() {
 
   echo "→ $OS/$ARCH"
 
-  GOOS=$OS GOARCH=$ARCH go build -o "$OUT_DIR/$APP$EXT"
+  GOOS=$OS GOARCH=$ARCH go build -o "$OUT_DIR/$APP$EXT" ./cmd/whitebox/main.go
 
   # playbox
   cp -r ./playbox "$OUT_DIR/"
