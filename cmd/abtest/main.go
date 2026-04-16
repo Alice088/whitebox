@@ -43,15 +43,25 @@ func main() {
 
 	cases := []abtest.Case{
 		{
-			Name:   "nice prompt: v1",
+			Name:   "normal",
 			Input:  "create file test.txt",
-			Prompt: plusBase(load("./testing/abtest/prompts/files/example_v1.md")),
+			Prompt: plusBase(load("./testing/abtest/prompts/files/normal.md")),
 		},
+		//{
+		//	Name:   "loop_force",
+		//	Input:  "create file test.txt",
+		//	Prompt: plusBase(load("./testing/abtest/prompts/files/loop_force.md")),
+		//},
 		{
-			Name:   "bad prompt: v2",
+			Name:   "extra_use",
 			Input:  "create file test.txt",
-			Prompt: plusBase(load("./testing/abtest/prompts/files/example_v2.md")),
+			Prompt: plusBase(load("./testing/abtest/prompts/files/extra_use.md")),
 		},
+		//{
+		//	Name:   "analyst",
+		//	Input:  "create file test.txt",
+		//	Prompt: plusBase(load("./testing/abtest/prompts/files/analyst.md")),
+		//},
 	}
 
 	logger.Info().Msg("Run butch")
