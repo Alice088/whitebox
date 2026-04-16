@@ -6,16 +6,18 @@ import (
 )
 
 func OutputLimit(str string, limit int) string {
-	lines := strings.Split(str, "\n")
+	str = Flat(str)
 
-	if len(lines) > limit {
-		visible := strings.Join(lines[:limit], "\n")
-		rest := len(lines) - limit
-		return fmt.Sprintf("%s\n...[+%d lines]", visible, rest)
+	if len(str) > limit {
+		return str[:limit] + fmt.Sprintf("...[+%d words]", len(str[limit:]))
 	}
-
 	return str
 }
+
+func Flat(str string) string {
+	return strings.Join(strings.Fields(str), " ")
+}
+
 func LimitArgs(args map[string]string, limit int) map[string]string {
 	out := make(map[string]string, len(args))
 

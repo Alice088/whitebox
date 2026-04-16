@@ -2,8 +2,8 @@ package abtest
 
 import (
 	"fmt"
-	"strings"
 	"whitebox/internal/core/tools"
+	"whitebox/pkg/messages"
 )
 
 func StringToolCallsHistory(history []tools.ToolCall) string {
@@ -16,27 +16,13 @@ func StringToolCallsHistory(history []tools.ToolCall) string {
 	for i, tool := range history {
 
 		if i == len(history)-1 {
-			str += fmt.Sprintf("%s(%+v) ] -> len(%d)", tool.Tool, stringArgs(tool.Arguments), len(history))
+			str += fmt.Sprintf("%s(%+v) ] -> len(%d)", tool.Tool, messages.StringArgs(tool.Arguments), len(history))
 		} else {
-			str += fmt.Sprintf("%s(%+v) -> ", tool.Tool, stringArgs(tool.Arguments))
+			str += fmt.Sprintf("%s(%+v) -> ", tool.Tool, messages.StringArgs(tool.Arguments))
 		}
 	}
 
 	return str
-}
-
-func stringArgs(args map[string]string) string {
-	if len(args) == 0 {
-		return ""
-	}
-
-	var parts []string
-
-	for k, v := range args {
-		parts = append(parts, fmt.Sprintf("%s:%s", k, v))
-	}
-
-	return strings.Join(parts, ", ")
 }
 
 func StringToolCalls(calls map[string]int) string {

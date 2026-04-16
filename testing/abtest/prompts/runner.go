@@ -22,7 +22,7 @@ func trimSpace(str string) string {
 }
 
 func (r *Runner) RunCase(c abtest.Case) abtest.Result {
-	r.Logger.Info().Str("sys_prompt", trimSpace(messages.OutputLimit(c.Prompt, 5))).Msg("Mocking context")
+	r.Logger.Info().Str("sys_prompt", trimSpace(messages.OutputLimit(c.Prompt, 100))).Msg("Mocking context")
 	r.Engine.Context = abtest.NewContext(c.Prompt)
 
 	var metrics abtest.Metrics

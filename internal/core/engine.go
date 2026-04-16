@@ -49,7 +49,7 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 			result = strings.TrimSpace(result)
 
 			emit(Event{"abtesting_tool_call", tc})
-			emit(Event{"tool_call", fmt.Sprintf("%s (%+v) \n - %s", tc.Tool, messages.LimitArgs(tc.Arguments, 2), messages.OutputLimit(result, 2))})
+			emit(Event{"tool_call", fmt.Sprintf("%s (%+v) \n - %s", tc.Tool, messages.StringArgs(tc.Arguments), messages.OutputLimit(result, 60))})
 			state.History += fmt.Sprintf(`
 						- Tool: %s
 						  Args: %+v
