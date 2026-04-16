@@ -1,10 +1,16 @@
 package prompts
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 	"whitebox/testing/abtest"
 	"whitebox/testing/abtest/detect"
+
+	"github.com/google/uuid"
 )
 
 func PrintReport(results []abtest.Result) {
@@ -74,6 +80,103 @@ func PrintReport(results []abtest.Result) {
 
 	fmt.Println()
 	fmt.Println("====================================")
+	fmt.Println()
+	fmt.Println("====================================")
+	fmt.Println("            RESULT")
+	fmt.Println("====================================")
+
+	winner, ok := abtest.PickWinner(results)
+	if !ok {
+		fmt.Println("No results")
+		return
+	}
+
+	score, _ := abtest.Score(winner.Metrics)
+
+	fmt.Printf("🏆 Winner: %s\n", winner.Name)
+	fmt.Printf("   Score: %d [%s]\n", score, abtest.ScoreTitle(score))
+
+	sorted := abtest.Compare(results)
+
+	fmt.Println()
+	fmt.Println("RANKING:")
+
+	for i, r := range sorted {
+		score, _ := abtest.Score(r.Metrics)
+
+		fmt.Printf("%d. %s → %d\n",
+			i+1,
+			r.Name,
+			score,
+		)
+	}
+
+	fmt.Println()
+	fmt.Println("====================================")
+	fmt.Println("            SAVE")
+	fmt.Println("====================================")
+
+	id := uuid.New().String()
+	dir := "./ab_testing_results"
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		fmt.Println("save error:", err)
+		return
+	}
+
+	type saved struct {
+		Name    string         `json:"name"`
+		Output  string         `json:"output"`
+		Error   string         `json:"error,omitempty"`
+		Score   int            `json:"score"`
+		Title   string         `json:"title"`
+		Metrics abtest.Metrics `json:"metrics"`
+	}
+
+	var out []saved
+
+	for _, r := range results {
+		score, _ := abtest.Score(r.Metrics)
+
+		s := saved{
+			Name:    r.Name,
+			Output:  r.Output,
+			Score:   score,
+			Title:   abtest.ScoreTitle(score),
+			Metrics: r.Metrics,
+		}
+
+		if r.Error != nil {
+			s.Error = r.Error.Error()
+		}
+
+		out = append(out, s)
+	}
+
+	report := map[string]any{
+		"id":      id,
+		"created": time.Now(),
+		"results": out,
+	}
+
+	path := filepath.Join(dir, id+".json")
+
+	f, err := os.Create(path)
+	if err != nil {
+		fmt.Println("save error:", err)
+		return
+	}
+	defer f.Close()
+
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
+
+	if err := enc.Encode(report); err != nil {
+		fmt.Println("save error:", err)
+		return
+	}
+
+	fmt.Println("saved to:", path)
 }
 
 func printMultiline(s string) {
