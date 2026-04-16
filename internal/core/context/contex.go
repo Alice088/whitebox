@@ -7,13 +7,14 @@ import (
 
 type Context interface {
 	Prompt() string
+	Session() Session
 	ClearMessages() error
 	AddMessage(msg Message) error
 	Collect() error
 }
 
 type Default struct {
-	Sessions Session
+	S        Session
 	Tools    []Item
 	Skills   []Item
 	Memories []Item
@@ -22,7 +23,7 @@ type Default struct {
 
 func New(session Session) Context {
 	return &Default{
-		Sessions: session,
+		S: session,
 	}
 }
 
@@ -50,7 +51,7 @@ func (c *Default) Prompt() string {
 		builder.WriteString(item.Content)
 	}
 
-	for _, msg := range c.Sessions.Messages {
+	for _, msg := range c.S.Messages {
 		builder.WriteString("\n")
 		builder.WriteString(msg.Role)
 		builder.WriteString(": ")
@@ -61,13 +62,13 @@ func (c *Default) Prompt() string {
 }
 
 func (c *Default) ClearMessages() error {
-	c.Sessions.Messages = []Message{}
-	return c.Sessions.SaveSession([]Message{})
+	c.S.Messages = []Message{}
+	return c.S.SaveSession([]Message{})
 }
 
 func (c *Default) AddMessage(msg Message) error {
-	c.Sessions.Messages = append(c.Sessions.Messages, msg)
-	return c.Sessions.SaveSession(c.Sessions.Messages)
+	c.S.Messages = append(c.S.Messages, msg)
+	return c.S.SaveSession(c.S.Messages)
 }
 
 func (c *Default) Collect() error {
@@ -94,4 +95,8 @@ func (c *Default) Collect() error {
 	}
 
 	return nil
+}
+
+func (c *Default) Session() Session {
+	return c.S
 }

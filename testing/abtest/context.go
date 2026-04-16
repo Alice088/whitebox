@@ -33,3 +33,7 @@ func (c *Context) AddMessage(msg context.Message) error {
 func (c *Context) Collect() error {
 	return nil
 }
+
+func (c *Context) Session() context.Session {
+	return context.Session{}
+}
