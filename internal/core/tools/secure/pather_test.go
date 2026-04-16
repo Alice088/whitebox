@@ -153,3 +153,28 @@ func TestPath_DoubleSlash(t *testing.T) {
 		t.Fatalf("expected %s, got %s", expected, p)
 	}
 }
+
+func setupMemory(t *testing.T) string {
+	dir, err := os.MkdirTemp("", "memory_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths.MemoriesDir = dir
+	return dir
+}
+func TestPath_MemoryWrite(t *testing.T) {
+	setupWorkspace(t)
+	setupMemory(t)
+
+	p, err := Path("memory/user/name.txt")
+	if err != nil {
+		t.Fatalf("memory path should be allowed: %v", err)
+	}
+
+	expected := filepath.Join(paths.MemoriesDir, "user/name.txt")
+
+	// важно: должен резолвиться в memory, а не workspace
+	if p != expected {
+		t.Fatalf("expected %s, got %s", expected, p)
+	}
+}

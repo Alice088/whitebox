@@ -2,6 +2,7 @@ package tools
 
 func init() {
 	Tools["read_file"] = ReadFile
+	Tools["memory"] = WriteFile
 	Tools["write_file"] = WriteFile
 	Tools["bash"] = Bash
 }

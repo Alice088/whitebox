@@ -13,40 +13,37 @@ func Path(path string) (string, error) {
 		return "", fmt.Errorf("empty path")
 	}
 
-	// запрещаем абсолютные пути
 	if filepath.IsAbs(path) {
 		return "", fmt.Errorf("absolute paths not allowed")
 	}
 
-	// собираем полный путь
-	fullPath := filepath.Join(paths.WorkspaceDir, path)
+	var root string
+
+	if strings.HasPrefix(path, "memory/") {
+		root = paths.MemoriesDir
+		path = strings.TrimPrefix(path, "memory/")
+	} else {
+		root = paths.WorkspaceDir
+	}
+
+	fullPath := filepath.Join(root, path)
 	cleanPath := filepath.Clean(fullPath)
 
-	// проверка выхода через ../
-	rel, err := filepath.Rel(paths.WorkspaceDir, cleanPath)
-	if err != nil {
-		return "", fmt.Errorf("invalid path")
-	}
-	if strings.HasPrefix(rel, "..") {
+	rel, err := filepath.Rel(root, cleanPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
 		return "", fmt.Errorf("access denied")
 	}
 
-	// резолвим symlink
 	realPath, err := filepath.EvalSymlinks(cleanPath)
 	if err != nil {
-		// если файл еще не существует (write_file) — это нормально
 		if !os.IsNotExist(err) {
 			return "", err
 		}
 		realPath = cleanPath
 	}
 
-	// повторная проверка после symlink
-	rel, err = filepath.Rel(paths.WorkspaceDir, realPath)
-	if err != nil {
-		return "", fmt.Errorf("invalid path")
-	}
-	if strings.HasPrefix(rel, "..") {
+	rel, err = filepath.Rel(root, realPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
 		return "", fmt.Errorf("access denied (symlink)")
 	}
 
