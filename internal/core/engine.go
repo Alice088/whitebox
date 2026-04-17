@@ -3,12 +3,13 @@ package core
 import (
 	"fmt"
 	"strings"
-	"time"
 	"whitebox/internal/core/context"
+	"whitebox/internal/core/embedded_prompts"
+	"whitebox/internal/core/fsm"
 	"whitebox/internal/core/llm"
+	"whitebox/internal/core/output"
 	"whitebox/internal/core/tools"
 	"whitebox/internal/langfuse"
-	"whitebox/pkg/messages"
 )
 
 type Engine struct {
@@ -17,8 +18,8 @@ type Engine struct {
 	CallChain CallChain
 }
 
+// todo добавть все побочныек промпты в langfuse
 func (e *Engine) Run(input string, emit func(Event)) (string, error) {
-	state := &State{Input: input, Task: input}
 	if w, ok := e.LLM.(*langfuse.LLMWrapper); ok {
 		err := w.StartTrace(input)
 		if err != nil {
@@ -27,88 +28,206 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 		defer w.EndTrace()
 	}
 
-	for i := 0; i < e.CallChain.Max; i++ {
-		emit(Event{"abtesting_loop_start", fmt.Sprintf("loop start (i=%d)", i+1)})
-
-		emit(Event{"debug", fmt.Sprintf("loop start (i=%d)", i+1)})
-		emit(Event{"debug", fmt.Sprintf("call LLM (sys_prompt_len=%.2ft)", e.LLM.EstimateTokens(e.Context.Prompt()))})
-
-		t := time.Now()
-		out, err := e.LLM.Ask(state.Input, e.Context.Prompt())
-		state.Output = out
-		emit(Event{"debug", fmt.Sprintf("got response from LLM (%s)", time.Since(t).String())})
-
-		if err != nil {
-			emit(Event{"error", fmt.Sprintf("ASK_ERR: %v", err)})
-			return "", err
+	defer func() {
+		if recv := recover(); recv != nil {
+			emit(Event{"error", fmt.Sprintf("RUN_ERR: %+v", recv)})
 		}
-		emit(Event{"debug", fmt.Sprintf("LLM OUTPUT: [%s]", out)})
+	}()
 
-		if tc, ok := tools.IsToolCall(out); ok {
-			result, err := e.LLM.Tool(tc)
-			result = strings.TrimSpace(result)
+	machine := fsm.New(e.CallChain.Max)
 
-			emit(Event{"abtesting_tool_call", tc})
-			emit(Event{"tool_call", fmt.Sprintf("%s (%+v) \n - %s", tc.Tool, messages.StringArgs(tc.Arguments), messages.OutputLimit(result, 60))})
-			state.History += fmt.Sprintf(`
-						- Tool: %s
-						  Args: %+v
-						  Result: %s
-						  Error: %v
-			`, tc.Tool, tc.Arguments, result, err)
+	for machine.Working() {
+		switch machine.State {
 
-			if err != nil {
-				emit(Event{Type: "error", Data: fmt.Sprintf("Call %s (%+v) \n - %s", tc.Tool, tc.Arguments, err.Error())})
+		case fsm.Idle:
+			machine.Memory.Goal = input
+			machine.Next()
 
-				state.Input = fmt.Sprintf(`
-					Tool "%s" executed with error.
-
-					You must NOT use this pattern again
-					Result:
-					%s
-					`, tc.Tool, err.Error())
-			} else {
-				state.Input = fmt.Sprintf(`
-						You are solving a task step by step.
-						
-						Task:
-						%s
-						
-						Previous actions:
-						%s
-						
-						Last tool result:
-						Tool: %s
-						Result:
-						%s
-						
-						Rules:
-						
-						Continue solving the task.
-						
-						If more actions are needed, call another tool.
-						If task is complete, give final answer.
-						
-						Decide your next step.
-					`, state.Task, state.History, tc.Tool, result) //todo это тоже в контекст перенести
-
+		case fsm.Analyze:
+			raw := strings.TrimSpace(machine.Memory.Goal)
+			if raw == "" {
+				machine.Errors = append(machine.Errors, "empty task")
+				machine.State = fsm.Failed
+				break
 			}
-			continue
-		}
-		state.Input = out
 
-		//if needsHuman(out) {
-		//	emit(Event{"human_request", out})
-		//
-		//	answer := waitUser()
-		//	emit(Event{"human_response", answer})
-		//
-		//	state.Input = answer
-		//	continue
-		//}
-		emit(Event{"final", out})
-		return out, nil
+			machine.Memory.Observations = append(
+				machine.Memory.Observations,
+				"task received",
+			)
+			machine.Next()
+
+		case fsm.Plan:
+			out, err := e.LLM.Ask(embedded_prompts.PlannerV1(machine.Memory.Goal), e.Context.Prompt())
+			if err != nil {
+				machine.Errors = append(machine.Errors, err.Error())
+				machine.State = fsm.Failed
+				break
+			}
+
+			answer, err := output.ToAnswer([]byte(out))
+			if err != nil {
+				machine.Errors = append(machine.Errors, "invalid planner json")
+				machine.State = fsm.Failed
+				break
+			}
+
+			if answer.Type != output.PlanType {
+				machine.Errors = append(machine.Errors, "invalid planner json: not a plan")
+				machine.State = fsm.Failed
+				break
+			}
+
+			plan, _ := answer.Struct.(output.Plan)
+
+			machine.Memory.Plan = plan.Steps
+			machine.Memory.Observations = append(
+				machine.Memory.Observations,
+				"plan created",
+			)
+			machine.Next()
+
+		case fsm.Act:
+			prompt := buildPrompt(machine)
+
+			out, err := e.LLM.Ask(prompt, e.Context.Prompt())
+			if err != nil {
+				machine.Errors = append(machine.Errors, err.Error())
+				machine.State = fsm.Failed
+				break
+			}
+
+			answer, err := output.ToAnswer([]byte(out))
+			if err != nil {
+				machine.Errors = append(machine.Errors, "invalid act json")
+				machine.State = fsm.Failed
+				break
+			}
+
+			switch answer.Type {
+
+			case output.ToolType:
+				toolCall, ok := answer.Struct.(output.Tool)
+				if !ok {
+					machine.Errors = append(machine.Errors, "invalid tool payload")
+					machine.State = fsm.Failed
+					break
+				}
+
+				result, toolErr := e.LLM.Tool(tools.ToolCall{
+					Tool:      toolCall.ToolName,
+					Arguments: toolCall.Arguments,
+				})
+
+				tr := fsm.ToolResult{
+					Command: toolCall.ToolName,
+					Output:  strings.TrimSpace(result),
+					Success: toolErr == nil,
+				}
+
+				if toolErr != nil {
+					tr.Error = toolErr.Error()
+					machine.Errors = append(machine.Errors, toolErr.Error())
+				}
+
+				machine.Memory.ToolResults = append(
+					machine.Memory.ToolResults,
+					tr,
+				)
+
+				machine.Memory.LastAction = toolCall.ToolName
+				machine.Memory.LastResult = tr.Output
+
+				machine.State = fsm.Observe
+
+			case output.FinalType:
+				finalAnswer, ok := answer.Struct.(output.Final)
+				if !ok {
+					machine.Errors = append(machine.Errors, "invalid final payload")
+					machine.State = fsm.Failed
+					break
+				}
+
+				machine.Memory.LastResult = finalAnswer.Answer
+				machine.State = fsm.Finalize
+
+			case output.PlanType:
+				plan, ok := answer.Struct.(output.Plan)
+				if !ok {
+					machine.Errors = append(machine.Errors, "invalid plan payload")
+					machine.State = fsm.Failed
+					break
+				}
+
+				machine.Memory.Plan = plan.Steps
+				machine.Memory.Observations = append(
+					machine.Memory.Observations,
+					"plan updated",
+				)
+
+				machine.State = fsm.Act
+
+			default:
+				machine.Errors = append(machine.Errors, "unknown response type")
+				machine.State = fsm.Failed
+			}
+
+		case fsm.Observe:
+			machine.Memory.Observations = append(
+				machine.Memory.Observations,
+				machine.Memory.LastResult,
+			)
+			machine.State = fsm.Reflect
+
+		case fsm.Reflect:
+			machine.Memory.Attempts++
+
+			if machine.Memory.Attempts >= machine.MaxSteps {
+				machine.State = fsm.Failed
+			} else {
+				machine.State = fsm.Act
+			}
+
+		case fsm.Finalize:
+			machine.State = fsm.Done
+		}
+
+		machine.Iteration++
 	}
 
-	return "", fmt.Errorf("loop limit")
+	if machine.State == fsm.Failed {
+		return "", fmt.Errorf("failed: %s", strings.Join(machine.Errors, "; "))
+	}
+
+	return machine.Memory.LastResult, nil
+}
+
+func buildPrompt(m fsm.Machine) string {
+	return fmt.Sprintf(`
+		You are solving a task step by step.
+		
+		Goal:
+		%s
+		
+		Plan:
+		%s
+		
+		Observations:
+		%s
+		
+		Last action:
+		%s
+		
+		Last result:
+		%s
+		
+		If needed, call a tool.
+		If task is complete, return final answer only.
+`,
+		m.Memory.Goal,
+		strings.Join(m.Memory.Plan, "\n"),
+		strings.Join(m.Memory.Observations, "\n"),
+		m.Memory.LastAction,
+		m.Memory.LastResult,
+	)
 }

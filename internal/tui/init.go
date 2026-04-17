@@ -13,6 +13,7 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/atotto/clipboard"
 
 	"github.com/alecthomas/chroma/v2/quick"
 )
@@ -167,8 +168,11 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
 
-		case "ctrl+c", "esc":
+		case "ctrl+d", "esc":
 			return m, tea.Quit
+		case "ctrl+v":
+			text, _ := clipboard.ReadAll()
+			m.textarea.InsertString(text)
 
 		case "enter":
 			if m.loading {

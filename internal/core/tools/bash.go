@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"strings"
 	"time"
 	"whitebox/internal/core/tools/secure"
 	"whitebox/internal/paths"
@@ -19,29 +18,34 @@ func Bash(arguments map[string]string) (string, error) {
 		return "", errors.New("command field required")
 	}
 
-	if err := secure.Command(arguments["command"]); err != nil {
-		return "", fmt.Errorf("unsecure command: %w", err)
+	command := arguments["command"]
+	if command == "" {
+		return "", errors.New("empty command")
 	}
 
-	parts := strings.Fields(arguments["command"])
-	if len(parts) == 0 {
-		return "", errors.New("invalid command")
+	if err := secure.Command(command); err != nil {
+		return "", fmt.Errorf("unsecure command: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
+	cmd := exec.CommandContext(ctx, "bash", "-lc", command)
 	cmd.Dir = paths.WorkspaceDir
 	sys.SetSysProcAttr(cmd)
 
 	output, err := cmd.CombinedOutput()
+
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return string(output), errors.New("command timeout")
+	}
+
 	if err != nil {
 		return string(output), fmt.Errorf("execution error: %w", err)
 	}
 
 	if len(output) == 0 {
-		output = []byte("OK")
+		return "OK", nil
 	}
 
 	return string(output), nil
