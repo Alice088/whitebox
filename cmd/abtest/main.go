@@ -18,10 +18,7 @@ func main() {
 	}))
 	config := cfg.MustConfig(logger)
 
-	llm, err := factory.LLM(factory.ProviderOpts{
-		"deepseek",
-		factory.APIProvider,
-	}, providers.InitOpts{
+	llm, err := factory.LLM("deepseek", providers.InitOpts{
 		Model:  "deepseek-reasoner",
 		ApiKey: config.LLM.ApiKey,
 	})

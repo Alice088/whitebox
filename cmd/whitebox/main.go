@@ -4,7 +4,7 @@ import (
 	"whitebox/internal/core"
 	syscontext "whitebox/internal/core/context"
 	"whitebox/internal/factory"
-	"whitebox/internal/flag"
+	"whitebox/internal/flags"
 	"whitebox/internal/langfuse"
 	"whitebox/internal/providers"
 	"whitebox/internal/tui"
@@ -22,10 +22,10 @@ func init() {
 
 func main() {
 	logger := logging.MustLogger()
-	input := flag.MustInput(logger)
+	flag := flags.MustInput(logger)
 	config := cfg.MustConfig(logger)
 
-	session := syscontext.NewSession(input.SessionID, config.Session)
+	session := syscontext.NewSession(flag.SessionID, config.Session)
 	err := session.CreateSessionDir()
 	if err != nil {
 		logger.Fatal().Err(err).Send()
@@ -38,8 +38,8 @@ func main() {
 		logger.Fatal().Err(err).Send()
 	}
 
-	llm, err := factory.LLM(input.Provider, providers.InitOpts{
-		Model:  input.Model,
+	llm, err := factory.LLM(config.LLM.Provide, providers.InitOpts{
+		Model:  config.LLM.Model,
 		ApiKey: config.LLM.ApiKey,
 	})
 	if err != nil {
@@ -60,6 +60,6 @@ func main() {
 		},
 	}
 
-	chat := tui.New(engine, input.Debug)
+	chat := tui.New(engine, flag.Debug)
 	chat.Run()
 }

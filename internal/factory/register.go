@@ -6,6 +6,6 @@ import (
 )
 
 func registerProviders() {
-	RegisterAPI("deepseek", deepseek.New)
-	RegisterLocal(defaultLocalProvider, llamacpp.New)
+	Register("deepseek", deepseek.New)
+	Register("llamacpp", llamacpp.New)
 }
