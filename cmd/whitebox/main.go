@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"whitebox/internal/core"
 	syscontext "whitebox/internal/core/context"
+	"whitebox/internal/core/embedded_prompts"
 	"whitebox/internal/factory"
 	"whitebox/internal/flags"
 	"whitebox/internal/langfuse"
@@ -32,7 +34,7 @@ func main() {
 	}
 	session.MustLoadMessages(&logger)
 
-	systemContext := syscontext.New(session)
+	systemContext := syscontext.New(session, embedded_prompts.OutputV1())
 	err = systemContext.Collect()
 	if err != nil {
 		logger.Fatal().Err(err).Send()
@@ -58,6 +60,21 @@ func main() {
 		CallChain: core.CallChain{
 			Max: config.CallChain.Max,
 		},
+	}
+
+	if flag.Headless {
+		if len(flag.Msg) == 0 {
+			panic("msg empty in headless mode")
+		}
+
+		answer, err := engine.Run(flag.Msg, func(event core.Event) {
+			fmt.Printf("%+v\n", event)
+		})
+		if err != nil {
+			panic("run err: " + err.Error())
+		}
+		fmt.Println(answer)
+		return
 	}
 
 	chat := tui.New(engine, flag.Debug)

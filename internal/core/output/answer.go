@@ -8,26 +8,52 @@ import (
 func ToAnswer(bytes []byte) (Answer, error) {
 	answer := Answer{}
 
-	var f Final
-	if err := json.Unmarshal(bytes, &f); err == nil {
-		answer.Struct = f
+	var meta struct {
+		Type string `json:"type"`
+	}
+
+	if err := json.Unmarshal(bytes, &meta); err != nil {
+		return answer, err
+	}
+
+	switch meta.Type {
+
+	case string(FinalType):
+		var v Final
+		if err := json.Unmarshal(bytes, &v); err != nil {
+			return answer, err
+		}
 		answer.Type = FinalType
+		answer.Struct = v
 		return answer, nil
-	}
 
-	var p Plan
-	if err := json.Unmarshal(bytes, &p); err == nil {
-		answer.Struct = p
+	case string(PlanType):
+		var v Plan
+		if err := json.Unmarshal(bytes, &v); err != nil {
+			return answer, err
+		}
 		answer.Type = PlanType
+		answer.Struct = v
 		return answer, nil
-	}
 
-	var t Tool
-	if err := json.Unmarshal(bytes, &t); err == nil {
-		answer.Struct = t
+	case string(ToolType):
+		var v Tool
+		if err := json.Unmarshal(bytes, &v); err != nil {
+			return answer, err
+		}
 		answer.Type = ToolType
+		answer.Struct = v
+		return answer, nil
+
+	case string(AskType):
+		var v Ask
+		if err := json.Unmarshal(bytes, &v); err != nil {
+			return answer, err
+		}
+		answer.Type = AskType
+		answer.Struct = v
 		return answer, nil
 	}
 
-	return answer, errors.New("invalid format")
+	return answer, errors.New("unknown type")
 }

@@ -6,6 +6,7 @@ const (
 	FinalType Type = "final"
 	ToolType  Type = "tool"
 	PlanType  Type = "plan"
+	AskType   Type = "ask"
 )
 
 type Answer struct {
@@ -18,9 +19,14 @@ type Final struct {
 	Answer string `json:"answer"`
 }
 
+type Ask struct {
+	Type   string `json:"type"`
+	Answer bool   `json:"answer"`
+}
+
 type Tool struct {
 	Type      string            `json:"type"`
-	ToolName  string            `json:"tool_name"`
+	ToolName  string            `json:"tool"`
 	Arguments map[string]string `json:"arguments"`
 }
 

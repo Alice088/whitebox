@@ -9,8 +9,6 @@ type WorkingMemory struct {
 
 	LastAction string
 	LastResult string
-
-	Attempts int
 }
 
 type ToolResult struct {

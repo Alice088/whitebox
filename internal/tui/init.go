@@ -23,17 +23,13 @@ var inlineCodeStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("255")).
 	Padding(0, 1)
 
-type eventsMsg struct {
-	events chan core.Event
-}
-
 type eventTickMsg struct {
 	event core.Event
 	ok    bool
 }
 
 type tuiModel struct {
-	program     *tea.Program // 🔥 ВАЖНО
+	program     *tea.Program
 	chat        *Chat
 	viewport    viewport.Model
 	messages    []string
@@ -138,12 +134,6 @@ func askCmd(p *tea.Program, chat *Chat, input string) tea.Cmd {
 			p.Send(eventTickMsg{ok: false})
 		}()
 		return nil
-	}
-}
-func nextEventCmd(ch chan core.Event) tea.Cmd {
-	return func() tea.Msg {
-		e, ok := <-ch
-		return eventTickMsg{event: e, ok: ok}
 	}
 }
 

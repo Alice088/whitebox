@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 	"whitebox/internal/core/tools/secure"
 	"whitebox/internal/paths"
@@ -44,8 +45,8 @@ func Bash(arguments map[string]string) (string, error) {
 		return string(output), fmt.Errorf("execution error: %w", err)
 	}
 
-	if len(output) == 0 {
-		return "OK", nil
+	if strings.TrimSpace(string(output)) == "" {
+		output = []byte("OK")
 	}
 
 	return string(output), nil

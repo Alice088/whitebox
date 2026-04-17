@@ -3,13 +3,11 @@ package fsm
 type State string
 
 const (
-	Idle    State = "idle"
-	Analyze State = "analyze"
-	Plan    State = "plan"
-	Act     State = "act"
-	Observe State = "observe"
-	Reflect State = "reflect"
-	//NeedInput State = "need_input" #todo
+	Idle     State = "idle"
+	Analyze  State = "analyze"
+	Plan     State = "plan"
+	Act      State = "act"
+	Observe  State = "observe"
 	Finalize State = "finalize"
 	Done     State = "done"
 	Failed   State = "failed"
@@ -26,6 +24,8 @@ type Machine struct {
 
 	Iteration int
 	MaxSteps  int
+
+	CurrentStep int
 
 	Memory WorkingMemory
 
@@ -47,20 +47,21 @@ func (m *Machine) Next() {
 	switch m.State {
 	case Idle:
 		m.State = Analyze
-
 	case Analyze:
 		m.State = Plan
-
 	case Plan:
 		m.State = Act
-
 	case Observe:
-		m.State = Reflect
-
-	case Reflect:
 		m.State = Act
-
 	case Finalize:
 		m.State = Done
 	}
+}
+
+func (m *Machine) MarkStepDone(result string) {
+	if m.CurrentStep >= len(m.Memory.Plan) {
+		return
+	}
+
+	m.CurrentStep++
 }

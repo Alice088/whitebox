@@ -14,17 +14,24 @@ type Context interface {
 }
 
 type Default struct {
-	S        Session
-	Tools    []Item
-	Skills   []Item
-	Memories []Item
-	Minds    []Item
+	S               Session
+	Tools           []Item
+	Skills          []Item
+	Memories        []Item
+	Minds           []Item
+	EmbeddedPrompts []string
 }
 
-func New(session Session) Context {
-	return &Default{
+func New(session Session, embeddedPrompts ...string) Context {
+	d := &Default{
 		S: session,
 	}
+
+	for _, prompt := range embeddedPrompts {
+		d.EmbeddedPrompts = append(d.EmbeddedPrompts, prompt)
+	}
+
+	return d
 }
 
 type Item struct {
@@ -49,6 +56,9 @@ func (c *Default) Prompt() string {
 
 	for _, item := range c.Tools {
 		builder.WriteString(item.Content)
+	}
+	for _, prompt := range c.EmbeddedPrompts {
+		builder.WriteString(prompt)
 	}
 
 	for _, msg := range c.S.Messages {
