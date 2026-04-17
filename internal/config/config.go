@@ -8,7 +8,9 @@ type Config struct {
 }
 
 type LLM struct {
-	ApiKey string `env:"LLM_API_KEY,required"`
+	ApiKey  string `env:"LLM_API_KEY,required"`
+	Provide string `env:"LLM_PROVIDER,required"`
+	Model   string `env:"LLM_MODEL,required"`
 }
 
 type Observability struct {

@@ -1,7 +1,9 @@
 package cfg
 
 import (
+	"path/filepath"
 	"whitebox/internal/config"
+	"whitebox/internal/paths"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
@@ -9,7 +11,7 @@ import (
 )
 
 func MustConfig(logger zerolog.Logger) config.Config {
-	err := godotenv.Load()
+	err := godotenv.Load(filepath.Join(paths.Base(), ".env"))
 	if err != nil {
 		logger.Fatal().Err(err).Send()
 	}
