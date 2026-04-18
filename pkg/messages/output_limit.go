@@ -18,6 +18,10 @@ func Flat(str string) string {
 	return strings.Join(strings.Fields(str), " ")
 }
 
+func FlatArr(arr []string) string {
+	return strings.Join(arr, " => ")
+}
+
 func LimitArgs(args map[string]string, limit int) map[string]string {
 	out := make(map[string]string, len(args))
 

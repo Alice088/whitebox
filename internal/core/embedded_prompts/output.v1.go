@@ -32,7 +32,7 @@ func OutputV1() string {
 		4. Ask
 		{
 		  "type": "ask",
-		  "answer": true
+		  "bool": true
 		}
 		
 		CONTROL MODE
@@ -53,14 +53,14 @@ func OutputV1() string {
 		=> return only:
 		{
 		  "type": "ask",
-		  "answer": true
+		  "bool": true
 		}
 		
 		message-call: plan
 		=> return only:
 		{
 		  "type": "plan",
-		  "steps": ["step 1"]
+		  "steps": ["step 1", "step 2", ...]
 		}
 		
 		Rules:
@@ -91,7 +91,7 @@ func OutputV1() string {
 		
 		{
 		  "type": "ask",
-		  "answer": false
+		  "bool": false
 		}
 		
 		{

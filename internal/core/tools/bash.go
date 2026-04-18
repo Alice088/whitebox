@@ -45,9 +45,11 @@ func Bash(arguments map[string]string) (string, error) {
 		return string(output), fmt.Errorf("execution error: %w", err)
 	}
 
-	if strings.TrimSpace(string(output)) == "" {
-		output = []byte("OK")
+	out := strings.TrimSpace(string(output))
+
+	if len(out) == 0 {
+		out = "OK"
 	}
 
-	return string(output), nil
+	return out, nil
 }

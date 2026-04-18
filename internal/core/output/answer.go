@@ -5,55 +5,68 @@ import (
 	"errors"
 )
 
-func ToAnswer(bytes []byte) (Answer, error) {
-	answer := Answer{}
-
+func ToAnswer[T any](bytes []byte) (Answer[T], error) {
 	var meta struct {
-		Type string `json:"type"`
+		Type Type `json:"type"`
 	}
 
 	if err := json.Unmarshal(bytes, &meta); err != nil {
-		return answer, err
+		return Answer[T]{}, err
 	}
+
+	var result Answer[T]
+	result.Type = meta.Type
 
 	switch meta.Type {
 
-	case string(FinalType):
+	case FinalType:
 		var v Final
 		if err := json.Unmarshal(bytes, &v); err != nil {
-			return answer, err
+			return result, err
 		}
-		answer.Type = FinalType
-		answer.Struct = v
-		return answer, nil
+		casted, ok := any(v).(T)
+		if !ok {
+			return Answer[T]{}, errors.New("unexpected type: not Final")
+		}
+		result.Struct = casted
+		return result, nil
 
-	case string(PlanType):
+	case PlanType:
 		var v Plan
 		if err := json.Unmarshal(bytes, &v); err != nil {
-			return answer, err
+			return result, err
 		}
-		answer.Type = PlanType
-		answer.Struct = v
-		return answer, nil
+		casted, ok := any(v).(T)
+		if !ok {
+			return Answer[T]{}, errors.New("unexpected type: not Plan")
+		}
+		result.Struct = casted
+		return result, nil
 
-	case string(ToolType):
+	case ToolType:
 		var v Tool
 		if err := json.Unmarshal(bytes, &v); err != nil {
-			return answer, err
+			return result, err
 		}
-		answer.Type = ToolType
-		answer.Struct = v
-		return answer, nil
+		casted, ok := any(v).(T)
+		if !ok {
+			return Answer[T]{}, errors.New("unexpected type: not Tool")
+		}
+		result.Struct = casted
+		return result, nil
 
-	case string(AskType):
+	case AskType:
 		var v Ask
 		if err := json.Unmarshal(bytes, &v); err != nil {
-			return answer, err
+			return result, err
 		}
-		answer.Type = AskType
-		answer.Struct = v
-		return answer, nil
+		casted, ok := any(v).(T)
+		if !ok {
+			return Answer[T]{}, errors.New("unexpected type: not Ask")
+		}
+		result.Struct = casted
+		return result, nil
 	}
 
-	return answer, errors.New("unknown type")
+	return Answer[T]{}, errors.New("unknown type")
 }

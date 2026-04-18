@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	maxObservationItems = 3
-	maxObservationSize  = 220
-	maxLastResultSize   = 400
+	maxObservationItems = 30
+	maxObservationSize  = 1880
+	maxLastResultSize   = 5000
 )
 
 type Engine struct {
@@ -68,7 +68,6 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 		switch machine.State {
 
 		case fsm.Idle:
-			emit(Event{"debug", "idle:init_goal"})
 			machine.Memory.Goal = input
 			machine.Next()
 
@@ -81,18 +80,10 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 				break
 			}
 
-			prompt := embedded_prompts.IsNeedPlanModeV1(raw)
-
-			t := time.Now()
-			out, err := e.LLM.Ask(prompt, e.Context.Prompt())
-
-			emit(Event{
-				"debug",
-				fmt.Sprintf(
-					"llm:classifier done in=%dms",
-					time.Since(t).Milliseconds(),
-				),
-			})
+			out, err := e.LLM.Ask(
+				embedded_prompts.IsNeedPlanModeV1(raw),
+				e.Context.Prompt(),
+			)
 
 			if err != nil {
 				machine.Errors = append(machine.Errors, "failed classifier")
@@ -100,72 +91,72 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 				break
 			}
 
-			answer, err := output.ToAnswer([]byte(out))
+			answer, err := output.ToAnswer[output.Ask]([]byte(out))
 			if err != nil {
 				machine.Errors = append(machine.Errors, "invalid ask json")
 				machine.State = fsm.Failed
 				break
 			}
 
-			ask := answer.Struct.(output.Ask)
-
 			addObservation(&machine, "task received")
 
-			if ask.Answer {
+			if answer.Struct.Bool {
 				machine.Next()
 			} else {
 				machine.State = fsm.Act
 			}
 
 		case fsm.Plan:
+			var answer output.Answer[output.Plan]
+			ok := false
 			prompt := embedded_prompts.PlannerV1(machine.Memory.Goal)
+			for i := 0; i < 3; i++ {
+				out, err := e.LLM.Ask(prompt, e.Context.Prompt())
 
-			t := time.Now()
-			out, err := e.LLM.Ask(prompt, e.Context.Prompt())
+				if err != nil {
+					machine.Errors = append(machine.Errors, err.Error())
+					machine.State = fsm.Failed
+					break
+				}
 
-			emit(Event{
-				"debug",
-				fmt.Sprintf(
-					"llm:planner done in=%dms",
-					time.Since(t).Milliseconds(),
-				),
-			})
+				answer, err = output.ToAnswer[output.Plan]([]byte(out))
+				if err != nil {
+					if i == 2 {
+						machine.Errors = append(machine.Errors, "invalid planner json")
+						machine.State = fsm.Failed
+					} else {
+						emit(Event{
+							"debug",
+							fmt.Sprintf(
+								"ERR_PLAN: %s ",
+								"\nyour answer had mistake, fix previous error: "+fmt.Sprintf("invalid plan json: %s", err.Error()),
+							),
+						})
 
-			if err != nil {
-				machine.Errors = append(machine.Errors, err.Error())
-				machine.State = fsm.Failed
+						prompt = embedded_prompts.PlannerV1(machine.Memory.Goal) +
+							"\nyour answer had mistake, fix previous error: " + fmt.Sprintf("invalid plan json: %s", err.Error())
+					}
+					continue
+				}
+				ok = true
 				break
 			}
 
-			answer, err := output.ToAnswer([]byte(out))
-			if err != nil {
-				machine.Errors = append(machine.Errors, "invalid planner json")
-				machine.State = fsm.Failed
+			if !ok {
 				break
 			}
 
-			plan := answer.Struct.(output.Plan)
-
-			machine.Memory.Plan = plan.Steps
+			machine.Memory.Plan = normalizePlan(answer.Struct.Steps)
 			machine.CurrentStep = 0
 			machine.Next()
 
 		case fsm.Act:
 			machine.Iteration++
 
-			prompt := buildPrompt(&machine)
-
-			t := time.Now()
-			out, err := e.LLM.Ask(prompt, e.Context.Prompt())
-
-			emit(Event{
-				"debug",
-				fmt.Sprintf(
-					"llm:act done in=%dms output_tokens=%.0f",
-					time.Since(t).Milliseconds(),
-					e.LLM.EstimateTokens(out),
-				),
-			})
+			out, err := e.LLM.Ask(
+				buildPrompt(&machine),
+				e.Context.Prompt(),
+			)
 
 			if err != nil {
 				machine.Errors = append(machine.Errors, err.Error())
@@ -179,7 +170,7 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 				break
 			}
 
-			answer, err := output.ToAnswer([]byte(out))
+			answer, err := output.ToAnswer[any]([]byte(out))
 			if err != nil {
 				machine.Errors = append(machine.Errors, "invalid act json")
 				machine.State = fsm.Failed
@@ -216,10 +207,11 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 					machine.Errors = append(machine.Errors, toolErr.Error())
 				}
 
-				machine.Memory.ToolResults = append(
-					machine.Memory.ToolResults,
-					tr,
-				)
+				machine.Memory.ToolResults = append(machine.Memory.ToolResults, tr)
+
+				if tr.Success {
+					machine.MarkStepDone()
+				}
 
 				machine.Memory.LastAction = toolCall.ToolName
 				machine.Memory.LastResult = summarizeResult(
@@ -230,21 +222,19 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 				machine.State = fsm.Observe
 
 			case output.FinalType:
-				finalAnswer := answer.Struct.(output.Final)
-
-				if machine.CurrentStep < len(machine.Memory.Plan) {
-					machine.CurrentStep = len(machine.Memory.Plan)
-				}
-
-				machine.Memory.LastResult = finalAnswer.Answer
+				machine.CurrentStep = len(machine.Memory.Plan)
+				machine.Memory.LastResult =
+					answer.Struct.(output.Final).Answer
 				machine.State = fsm.Finalize
 
 			case output.PlanType:
-				machine.Memory.Plan =
-					answer.Struct.(output.Plan).Steps
-				machine.CurrentStep = 0
 				addObservation(&machine, "replanning")
-				machine.State = fsm.Act
+				machine.Errors = append(
+					machine.Errors,
+					"replanning don't allow in act",
+				)
+
+				machine.State = fsm.Failed
 
 			default:
 				machine.Errors = append(
@@ -257,32 +247,22 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 		case fsm.Observe:
 			addObservation(
 				&machine,
-				machine.Memory.LastAction+
-					"=>"+
-					machine.Memory.LastResult,
+				machine.Memory.LastAction+" => "+machine.Memory.LastResult,
 			)
 
-			if len(machine.Memory.ToolResults) > 0 {
-				last := machine.Memory.ToolResults[len(machine.Memory.ToolResults)-1]
-
-				if last.Success &&
-					machine.CurrentStep < len(machine.Memory.Plan) {
-					machine.CurrentStep++
-				}
+			if machine.CurrentStep >= len(machine.Memory.Plan) {
+				machine.State = fsm.Finalize
+				break
 			}
 
 			machine.Next()
 
 		case fsm.Finalize:
 			emit(Event{
-				"debug",
-				fmt.Sprintf(
-					"run:done total_ms=%d",
-					time.Since(runStarted).Milliseconds(),
-				),
+				"final",
+				machine.Memory.LastResult,
 			})
 
-			emit(Event{"final", machine.Memory.LastResult})
 			machine.State = fsm.Done
 		}
 	}
@@ -293,20 +273,25 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 			strings.Join(machine.Errors, "; "),
 		)
 
-		emit(Event{"debug", errText})
-		emit(Event{"error", errText})
-
 		return "", fmt.Errorf(errText)
 	}
+
+	emit(Event{
+		"debug",
+		fmt.Sprintf(
+			"run:done total_ms=%d",
+			time.Since(runStarted).Milliseconds(),
+		),
+	})
 
 	return machine.Memory.LastResult, nil
 }
 
 func buildPrompt(m *fsm.Machine) string {
-	nextStep := "finish task"
+	action := "finish task"
 
 	if m.CurrentStep < len(m.Memory.Plan) {
-		nextStep = m.Memory.Plan[m.CurrentStep]
+		action = m.Memory.Plan[m.CurrentStep]
 	}
 
 	return fmt.Sprintf(`
@@ -332,7 +317,7 @@ Plan:
 Current step:
 %d/%d
 
-Next step:
+Next action:
 %s
 
 Observations:
@@ -350,12 +335,19 @@ Rules:
 - Do not repeat completed steps
 - Prefer tool call when action is needed
 - If task complete return final
+- DO NOT return final if git status --short is not empty
+- If any file is:
+	- staged
+	- untracked
+	- modified
+- You MUST create commits until repository is clean.
+If there are untracked files (??):
+→ you MUST run git add before commit
 `,
 		m.Memory.Goal,
-		strings.Join(m.Memory.Plan, "\n"),
-		m.CurrentStep+1,
-		len(m.Memory.Plan),
-		nextStep,
+		messages.FlatArr(m.Memory.Plan),
+		m.CurrentStep+1, len(m.Memory.Plan),
+		action,
 		strings.Join(m.Memory.Observations, "\n"),
 		m.Memory.LastAction,
 		compact(m.Memory.LastResult, maxLastResultSize),
@@ -404,4 +396,23 @@ func compact(s string, limit int) string {
 	}
 
 	return s[:limit-3] + "..."
+}
+
+func normalizePlan(steps []string) []string {
+	out := make([]string, 0, len(steps))
+
+	for i, step := range steps {
+		s := strings.TrimSpace(step)
+		if s == "" {
+			continue
+		}
+		s = fmt.Sprintf("(%d) %s", i+1, s)
+		out = append(out, s)
+	}
+
+	if len(out) == 0 {
+		return []string{"finish task"}
+	}
+
+	return out
 }

@@ -92,7 +92,7 @@ func initialModel(chat *Chat) tuiModel {
 	ta.Focus()
 
 	ta.Prompt = "┃ "
-	ta.CharLimit = 1000
+	ta.CharLimit = 20000
 	ta.SetWidth(30)
 	ta.SetHeight(3)
 

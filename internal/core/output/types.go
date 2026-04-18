@@ -9,9 +9,9 @@ const (
 	AskType   Type = "ask"
 )
 
-type Answer struct {
+type Answer[T any] struct {
 	Type   Type
-	Struct any
+	Struct T
 }
 
 type Final struct {
@@ -20,8 +20,8 @@ type Final struct {
 }
 
 type Ask struct {
-	Type   string `json:"type"`
-	Answer bool   `json:"answer"`
+	Type string `json:"type"`
+	Bool bool   `json:"bool"`
 }
 
 type Tool struct {

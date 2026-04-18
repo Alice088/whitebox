@@ -65,7 +65,10 @@ func (w *LLMWrapper) Ask(prompt, systemPrompt string) (out string, err error) {
 		t.Output = out
 		_, err = w.Langfuse.Trace(t)
 		if err != nil {
-			out = ""
+			t.Output = model.M{
+				"completion": out,
+				"error":      err,
+			}
 			err = fmt.Errorf("failed update trace: %w", err)
 		}
 	}()
@@ -87,10 +90,9 @@ func (w *LLMWrapper) Ask(prompt, systemPrompt string) (out string, err error) {
 
 	w.State["generation"] = generation
 
-	var end *time.Time
 	defer func() {
 		generation.Output = model.M{"completion": out}
-		generation.EndTime = end
+		generation.EndTime = new(time.Now())
 		generation.Usage = model.Usage{
 			Input:  int(w.LLM.EstimateTokens(prompt)),
 			Output: int(w.LLM.EstimateTokens(out)),
@@ -98,7 +100,10 @@ func (w *LLMWrapper) Ask(prompt, systemPrompt string) (out string, err error) {
 		}
 		_, err = w.Langfuse.GenerationEnd(generation)
 		if err != nil {
-			out = ""
+			generation.Output = model.M{
+				"completion": out,
+				"error":      err,
+			}
 			err = fmt.Errorf("failed to end generation: %w", err)
 		}
 	}()
@@ -107,8 +112,6 @@ func (w *LLMWrapper) Ask(prompt, systemPrompt string) (out string, err error) {
 	if err != nil {
 		return "", err
 	}
-
-	end = new(time.Now())
 
 	return out, err
 }
@@ -134,18 +137,19 @@ func (w *LLMWrapper) Tool(call tools.ToolCall) (out string, err error) {
 		return "", fmt.Errorf("failed to create span(tool_call): %w", err)
 	}
 
-	var end *time.Time
 	defer func() {
 		generation.Output = model.M{"completion": out}
-		generation.EndTime = end
+		generation.EndTime = new(time.Now())
 		_, err = w.Langfuse.GenerationEnd(generation)
 		if err != nil {
-			out = ""
+			generation.Output = model.M{
+				"completion": out,
+				"error":      err,
+			}
 			err = fmt.Errorf("failed to end span: %w", err)
 		}
 	}()
 
-	end = new(time.Now())
 	return tools.Execute(call)
 }
 

@@ -58,7 +58,7 @@ func (m *Machine) Next() {
 	}
 }
 
-func (m *Machine) MarkStepDone(result string) {
+func (m *Machine) MarkStepDone() {
 	if m.CurrentStep >= len(m.Memory.Plan) {
 		return
 	}
