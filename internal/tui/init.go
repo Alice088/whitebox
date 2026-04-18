@@ -92,16 +92,14 @@ func initialModel(chat *Chat) tuiModel {
 	ta.Focus()
 
 	ta.Prompt = "┃ "
-	ta.CharLimit = 20000
-	ta.SetWidth(30)
-	ta.SetHeight(3)
+	ta.CharLimit = 350
 
 	s := ta.Styles()
 	s.Focused.CursorLine = lipgloss.NewStyle()
 	ta.SetStyles(s)
 
 	ta.ShowLineNumbers = false
-	ta.KeyMap.InsertNewline.SetEnabled(false)
+	ta.KeyMap.InsertNewline.SetEnabled(true)
 
 	messages := []string{
 		"Whitebox Chat Mode",
@@ -141,9 +139,14 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
-		m.viewport.SetWidth(msg.Width)
+		inputHeight := 3
+		extra := 2
+
 		m.textarea.SetWidth(msg.Width)
-		m.viewport.SetHeight(msg.Height - m.textarea.Height())
+		m.textarea.SetHeight(inputHeight)
+
+		m.viewport.SetWidth(msg.Width)
+		m.viewport.SetHeight(msg.Height - inputHeight - extra)
 		m.viewport.SetContent(m.renderContent())
 		m.viewport.GotoBottom()
 		return m, nil
@@ -247,7 +250,6 @@ func (m tuiModel) View() tea.View {
 		Render(strings.Repeat("─", m.viewport.Width()))
 
 	input := lipgloss.NewStyle().
-		MarginTop(1).
 		Render(m.textarea.View())
 
 	out := m.viewport.View() + "\n" + divider + "\n" + input
