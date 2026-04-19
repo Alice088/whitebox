@@ -2,167 +2,226 @@
   <img src="./static/whitebox.jpg" alt="Whitebox" />
 </div>
 
-# Whitebox
+---
 
-A personal AI assistant where context is explicitly controlled.
+A minimal FSM-based core for building fast, controlled AI agents.
 
-Whitebox is designed for cases where reproducibility, cost control, and understanding **what the model actually sees** matter.
+Whitebox is not a ready-made assistant.  
+It is a small runtime designed to build simple, specialized agents with full control.
 
 ---
 
 ## 1. What is Whitebox
 
-Whitebox is a minimal runtime for working with LLMs.
+Whitebox is a lightweight core built around an FSM orchestrator.
 
-It exists to remove hidden logic from agent systems:
+It is designed to:
 
-- context is defined by files, not “magic”
-- every step and cost can be observed (e.g. via Langfuse)
+- execute simple agent loops
+- keep behavior predictable
+- avoid hidden complexity
 
-Core idea: **context is a product interface, not an internal detail of the model**.
+You use it as a base to build your own agents.
 
 ---
 
 ## 2. Problem
 
-Most AI systems behave like black boxes:
+Most agent systems fail for one reason: uncontrolled context.
 
-- context grows without limits
-- noise leaks into the prompt
-- it’s unclear why the model answered the way it did
-- token usage becomes unpredictable
+- context grows without limits  
+- irrelevant data leaks into prompts  
+- hidden system injections affect behavior  
+- token usage becomes unpredictable  
 
-Result: more context ≠ better answers.
+Result:
+
+- higher API cost  
+- unstable outputs  
+- hard-to-debug behavior  
 
 ---
 
 ## 3. Core Idea
 
-Whitebox is built around three principles:
+Whitebox fixes this by making context explicit.
 
-- **Context as a single source of truth**: the model sees only what is inside `~/.whitebox/context`
-- **No hidden magic**: no implicit system layers, hidden injections, or automatic decisions
-- **System controls context, not LLM**: focus is managed by the system and file structure
+- context is loaded only from files  
+- nothing is injected implicitly  
+- no hidden system layers  
+
+The only fixed injection is the output protocol.
+
+Everything else is under your control.
 
 ---
 
-## 4. Architecture
+## 4. Context System
+
+Context is simple and transparent.
+
+```text
+~/.whitebox-name/
+- context/
+    - minds/
+    - memories/
+    - skills/
+    - tools/
+    - sessions/
+- workspace/
+````
+
+How it works:
+
+* files from `context/` are read and added to the prompt
+* nothing outside this directory exists for the model
+* no automatic memory, no hidden prompts
+
+This gives:
+
+* predictable inputs
+* stable outputs
+* controlled token usage
+
+You decide exactly what the model sees.
+
+---
+
+## 5. Output Protocol
+
+The only built-in rule is a strict output format.
+
+The model must return JSON:
+
+```json
+{
+  "type": "tool",
+  "tool": "bash",
+  "arguments": {
+    "command": "git status"
+  }
+}
+```
+
+or
+
+```json
+{
+  "type": "final",
+  "answer": "task completed"
+}
+```
+
+This removes ambiguity and keeps execution deterministic.
+
+---
+
+## 6. Architecture
+
+### FSM Orchestrator
+
+Simple states:
+
+* Idle
+* DoOne
+* DoSecond
+* Final
+* Fail
+
+No planning. No hidden reasoning.
+
+---
 
 ### Engine
 
 Execution loop:
 
-- builds prompt from Context
-- calls the LLM
-- checks for tool calls
-- executes tools if needed and continues the loop
-- returns final answer
+* call LLM
+* parse JSON
+* execute tool
+* continue
 
-### Context
+Maximum a few steps.
 
-Context is assembled from directories:
-
-1. `minds/`
-2. `memories/`
-3. `skills/`
-4. `tools/`
-5. `sessions/` (chat history)
-
-Order is fixed and deterministic.
-
-### Tools
-
-Tool calls are plain JSON returned by the model.
-
-Example:
-
-```json
-{
-  "tool": "read_file",
-  "arguments": {
-    "path": "notes/todo.md"
-  }
-}
-````
+---
 
 ### State
 
-Execution state is simple:
+Minimal:
 
-* current input
-* model output
-* number of steps in the call chain
+* goal
+* last result
 
-No hidden background agents.
-
-### TUI
-
-CLI interface built with Bubble Tea:
-
-* user input
-* live events (`debug`, `tool_call`, `final`)
-* session history persistence
+No built-in memory system.
 
 ---
 
-## 5. How it works
+## 7. Performance
 
-Execution flow:
+Whitebox is designed to be fast and cheap.
 
-1. User input
-2. Engine loop
-3. LLM call
-4. If tool is needed → execute tool
-5. Tool result goes back into the loop
-6. Final answer is generated
-7. Answer is saved in session history
+* written in Go
+* minimal runtime overhead
+* no background processes
+* no heavy abstractions
 
----
-
-## 6. Context System
-
-This is the core layer of Whitebox.
-
-After first run, the structure is created:
-
-```text
-~/.whitebox/
-  context/
-    minds/
-    memories/
-    skills/
-    tools/
-    sessions/
-  workspace/
-```
-
-Key points:
-
-* everything in `context/*` is included in the prompt
-* anything outside does not exist for the model
-* context can be explicitly cleaned, compressed, and rebuilt
-
-Practical effect:
-
-* less noise
-* lower token cost
-* more stable outputs
+Context control reduces token usage, which lowers LLM cost.
 
 ---
 
-## 7. Features
+## 8. Observability (Langfuse)
 
-* Transparent file-based context
-* Explicit execution loop
-* Tool calling via JSON
-* Observability via events and debug mode
-* Minimal architecture without hidden layers
+Built-in tracing via Langfuse:
+
+* full request trace
+* inputs and outputs
+* token usage
+* execution flow
+
+No hidden behavior. Everything is visible.
 
 ---
 
-## 8. Getting Started
+## 9. What You Get
 
-### 1) Install
+* fast FSM execution
+* strict and simple protocol
+* explicit context control
+* low resource usage
+* low LLM cost
+* no hidden logic
+
+---
+
+## 10. Use Case
+
+Whitebox is a core, not a product.
+
+You use it to build:
+
+* CLI agents
+* task-specific tools
+* automation scripts
+* internal assistants
+
+Each agent is simple and focused.
+
+---
+
+## 11. Positioning
+
+Whitebox can be seen as a “blaze agent” core:
+
+* fast
+* predictable
+* minimal
+* controllable
+
+It trades autonomy for control and efficiency.
+
+---
+
+## 12. Getting Started
 
 ```bash
 git clone https://github.com/Alice088/whitebox.git
@@ -170,85 +229,18 @@ cd whitebox
 go mod download
 ```
 
-### 2) Configure
-
 ```bash
 cp .env.example .env
 ```
 
-Set at least:
-
-* `LLM_API_KEY`
-* `SESSION_MAX_MESSAGES`
-* `CALL_CHAIN_MAX`
-
-### 3) Run
-
-Local provider:
-
 ```bash
-go run . --model <your-model> --provider local
+go run .
 ```
-
-API provider (e.g. DeepSeek):
-
-```bash
-go run . --model <your-model> --provider api --provider_name deepseek
-```
-
-### 4) First request
-
-Type a message in the TUI and press Enter.
 
 ---
 
-## 9. Examples
+## Philosophy
 
-### Basic conversation
-
-```text
-You: Create a migration plan for a Go service.
-Assistant: ...
-```
-
-### Reading a file via tool
-
-Model may return:
-
-```json
-{
-  "tool": "read_file",
-  "arguments": { "path": "docs/spec.md" }
-}
-```
-
-Engine reads the file from `~/.whitebox/workspace/docs/spec.md`, returns the result to the model, and requests a final answer.
-
-### Working with context
-
-1. Add `minds/product.md`
-2. Add `skills/code-review.md`
-3. Restart session
-
-These files become part of the system prompt.
-
----
-
-## 10. Philosophy
-
-Whitebox follows simple rules:
-
-* **Minimalism > complexity**
-* **Control > automation**
-* **Explicitness > magic**
-
-This is not a “smart autonomous agent”.
-
-It is an engineering tool where you control context, cost, and behavior.
-
----
-
-## Project status
-
-Whitebox is under active development.
-If you care about reproducibility and observability in LLM systems — this is a solid foundation.
+* control over automation
+* explicit over implicit
+* simple over complex

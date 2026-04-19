@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"whitebox/internal/config"
 	"whitebox/internal/core"
 	syscontext "whitebox/internal/core/context"
 	"whitebox/internal/core/embedded_prompts"
@@ -9,7 +10,6 @@ import (
 	"whitebox/internal/flags"
 	"whitebox/internal/langfuse"
 	"whitebox/internal/providers"
-	"whitebox/internal/tui"
 	"whitebox/pkg/cfg"
 	"whitebox/pkg/logging"
 	"whitebox/pkg/prepare"
@@ -18,7 +18,7 @@ import (
 func init() {
 	err := prepare.EnsureWhitebox()
 	if err != nil {
-		panic("Failed to init .whitebox")
+		panic(fmt.Sprintf("Failed to init .whitebox-%s", config.AgentName))
 	}
 }
 
@@ -34,7 +34,7 @@ func main() {
 	}
 	session.MustLoadMessages(&logger)
 
-	systemContext := syscontext.New(session, embedded_prompts.OutputV1())
+	systemContext := syscontext.New(session, embedded_prompts.OutputProtocolV1())
 	err = systemContext.Collect()
 	if err != nil {
 		logger.Fatal().Err(err).Send()
@@ -62,21 +62,12 @@ func main() {
 		},
 	}
 
-	if flag.Headless {
-		if len(flag.Msg) == 0 {
-			panic("msg empty in headless mode")
-		}
-
-		answer, err := engine.Run(flag.Msg, func(event core.Event) {
-			fmt.Printf("%+v\n", event)
-		})
-		if err != nil {
-			panic("run err: " + err.Error())
-		}
-		fmt.Println(answer)
-		return
+	answer, err := engine.Run(flag.Msg, func(event core.Event) {
+		fmt.Printf("%+v\n", event)
+	})
+	if err != nil {
+		panic("run err: " + err.Error())
 	}
-
-	chat := tui.New(engine, flag.Debug)
-	chat.Run()
+	fmt.Println(answer)
+	return
 }

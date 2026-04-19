@@ -1,5 +1,7 @@
 package config
 
+const AgentName = "core"
+
 type Config struct {
 	LLM           LLM
 	Observability Observability

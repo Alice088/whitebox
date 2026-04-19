@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"whitebox/internal/config"
 	"whitebox/internal/core/llm"
 	"whitebox/internal/core/tools"
 	"whitebox/pkg/maps"
@@ -39,7 +40,7 @@ func (w *LLMWrapper) StartTrace(originInput string) error {
 	}
 
 	trace, err := w.Langfuse.Trace(&model.Trace{
-		Name:      "whitebox-request",
+		Name:      fmt.Sprintf("whitebox-%s-request", config.AgentName),
 		Input:     originInput,
 		Timestamp: new(time.Now()),
 	})

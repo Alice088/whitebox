@@ -1,8 +1,10 @@
 package paths
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"whitebox/internal/config"
 )
 
 var (
@@ -22,5 +24,5 @@ func Base() string {
 		panic("failed to load home dir")
 	}
 
-	return filepath.Join(home, ".whitebox")
+	return filepath.Join(home, fmt.Sprintf(".whitebox-%s", config.AgentName))
 }

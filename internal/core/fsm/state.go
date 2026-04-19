@@ -4,13 +4,10 @@ type State string
 
 const (
 	Idle     State = "idle"
-	Analyze  State = "analyze"
-	Plan     State = "plan"
-	Act      State = "act"
-	Observe  State = "observe"
-	Finalize State = "finalize"
-	Done     State = "done"
-	Failed   State = "failed"
+	DoOne    State = "do_one"
+	DoSecond State = "do_second"
+	Final    State = "final"
+	Fail     State = "fail"
 )
 
 type Step struct {
@@ -20,48 +17,27 @@ type Step struct {
 }
 
 type Machine struct {
-	State State
-
-	Iteration int
-	MaxSteps  int
-
-	CurrentStep int
-
+	State  State
 	Memory WorkingMemory
-
-	Errors []string
 }
 
 func New(maxSteps int) Machine {
 	return Machine{
-		State:    Idle,
-		MaxSteps: maxSteps,
+		State: Idle,
 	}
 }
 
 func (m *Machine) Working() bool {
-	return m.State != Done && m.State != Failed
+	return m.State != Final && m.State != Fail
 }
 
 func (m *Machine) Next() {
 	switch m.State {
 	case Idle:
-		m.State = Analyze
-	case Analyze:
-		m.State = Plan
-	case Plan:
-		m.State = Act
-	case Observe:
-		m.State = Act
-	case Finalize:
-		m.State = Done
+		m.State = DoOne
+	case DoOne:
+		m.State = DoSecond
+	case DoSecond:
+		m.State = Final
 	}
-}
-
-func (m *Machine) MarkStepDone() {
-	if m.CurrentStep >= len(m.Memory.Plan) {
-		return
-	}
-
-	m.CurrentStep++
 }
