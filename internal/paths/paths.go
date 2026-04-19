@@ -2,7 +2,6 @@ package paths
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"whitebox/pkg/meta"
 )
@@ -19,10 +18,6 @@ var (
 )
 
 func Base() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic("failed to load home dir")
-	}
-
+	home := "./"
 	return filepath.Join(home, fmt.Sprintf(".whitebox-%s", meta.AgentName))
 }

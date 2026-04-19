@@ -8,3 +8,5 @@ context/*
 dist
 out
 ab_testing_results
+
+.whitebox-core
