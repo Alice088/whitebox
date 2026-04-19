@@ -4,94 +4,100 @@
 
 ---
 
-A minimal FSM-based core for building fast, controlled AI agents.
+A minimal FSM-based core for building fast, controlled agents for OrcAI.
 
-Whitebox is not a ready-made assistant.  
-It is a small runtime designed to build simple, specialized agents with full control.
+Whitebox is not a standalone assistant.  
+It is a runtime designed to work as an execution unit inside the OrcAI orchestration system.
 
 ---
 
 ## 1. What is Whitebox
 
-Whitebox is a lightweight core built around an FSM orchestrator.
+Whitebox is a lightweight agent core built around an FSM orchestrator.
 
 It is designed to:
 
-- execute simple agent loops
+- execute tasks received from OrcAI
 - keep behavior predictable
 - avoid hidden complexity
 
-You use it as a base to build your own agents.
+Each instance acts as a worker that processes tasks of a specific type.
 
 ---
 
 ## 2. Problem
 
-Most agent systems fail for one reason: uncontrolled context.
+In orchestration systems, the main issue is not intelligence, but control.
 
-- context grows without limits  
-- irrelevant data leaks into prompts  
-- hidden system injections affect behavior  
-- token usage becomes unpredictable  
+Typical agents:
+
+- accumulate uncontrolled context  
+- mix responsibilities  
+- behave inconsistently  
+- consume unpredictable tokens  
 
 Result:
 
-- higher API cost  
-- unstable outputs  
-- hard-to-debug behavior  
+- high API cost  
+- unstable execution  
+- hard-to-debug pipelines  
 
 ---
 
 ## 3. Core Idea
 
-Whitebox fixes this by making context explicit.
+Whitebox is designed for OrcAI’s model:
 
-- context is loaded only from files  
-- nothing is injected implicitly  
-- no hidden system layers  
+- tasks come from a broker (`task.created`)  
+- agents are stateless workers  
+- behavior is strictly controlled  
 
-The only fixed injection is the output protocol.
+Key principles:
 
-Everything else is under your control.
+- explicit context only  
+- no hidden injections  
+- deterministic execution  
+
+The only built-in injection is the output protocol.
 
 ---
 
 ## 4. Context System
 
-Context is simple and transparent.
+Context is simple and file-based.
 
 ```text
 ~/.whitebox-name/
-- context/
-    - minds/
-    - memories/
-    - skills/
-    - tools/
-    - sessions/
-- workspace/
+  context/
+    minds/
+    memories/
+    skills/
+    tools/
+    sessions/
+  workspace/
 ````
 
 How it works:
 
-* files from `context/` are read and added to the prompt
+* all files in `context/` are loaded into the prompt
 * nothing outside this directory exists for the model
-* no automatic memory, no hidden prompts
+* no implicit memory or hidden layers
 
-This gives:
+This ensures:
 
 * predictable inputs
 * stable outputs
 * controlled token usage
 
-You decide exactly what the model sees.
+Context is fully owned by the system.
 
 ---
 
 ## 5. Output Protocol
 
-The only built-in rule is a strict output format.
+The only built-in rule is a strict LLM output protocol.
 
-The model must return JSON:
+The model must respond in valid JSON:
 
 ```json
 {
@@ -101,7 +107,7 @@ The model must return JSON:
     "command": "git status"
   }
 }
-```
+````
 
 or
 
@@ -112,7 +118,14 @@ or
 }
 ```
 
-This removes ambiguity and keeps execution deterministic.
+This protocol is used by the engine to:
+
+* parse model output deterministically
+* decide whether to execute a tool or finish
+* keep execution predictable
+
+It is not related to OrcAI routing.
+OrcAI operates on task/event level, while this protocol is strictly between the LLM and the local engine.
 
 ---
 
@@ -120,7 +133,7 @@ This removes ambiguity and keeps execution deterministic.
 
 ### FSM Orchestrator
 
-Simple states:
+States:
 
 * Idle
 * DoOne
@@ -136,88 +149,97 @@ No planning. No hidden reasoning.
 
 Execution loop:
 
-* call LLM
-* parse JSON
-* execute tool
-* continue
+* receives task input
+* calls LLM
+* parses JSON
+* executes tool
+* publishes results back
 
-Maximum a few steps.
+Integrated with broker:
+
+* consumes `task.created`
+* emits `task.logs`, `task.result`, `task.error`
 
 ---
 
 ### State
 
-Minimal:
+Minimal runtime state:
 
 * goal
 * last result
 
-No built-in memory system.
+No persistent memory by default.
 
 ---
 
 ## 7. Performance
 
-Whitebox is designed to be fast and cheap.
+Whitebox is optimized for orchestration workloads.
 
 * written in Go
-* minimal runtime overhead
-* no background processes
-* no heavy abstractions
+* low memory usage
+* fast startup and execution
+* no background overhead
 
-Context control reduces token usage, which lowers LLM cost.
+Strict context control reduces token usage and cost.
 
 ---
 
 ## 8. Observability (Langfuse)
 
-Built-in tracing via Langfuse:
+Built-in support for Langfuse:
 
-* full request trace
-* inputs and outputs
+* full trace per task
+* LLM inputs and outputs
 * token usage
-* execution flow
+* execution steps
 
-No hidden behavior. Everything is visible.
+This makes every task observable inside OrcAI.
 
 ---
 
 ## 9. What You Get
 
-* fast FSM execution
-* strict and simple protocol
+* FSM-based execution worker
+* strict tool/final protocol
 * explicit context control
+* NATS-compatible task processing
 * low resource usage
-* low LLM cost
-* no hidden logic
+* predictable behavior
 
 ---
 
 ## 10. Use Case
 
-Whitebox is a core, not a product.
+Whitebox is used inside OrcAI to run agents.
 
-You use it to build:
+Each agent:
 
-* CLI agents
-* task-specific tools
-* automation scripts
-* internal assistants
+* subscribes to `task.created.*`
+* filters by `type`
+* processes only its tasks
+* publishes results back
 
-Each agent is simple and focused.
+Typical usage:
+
+* git agents
+* file system agents
+* code execution agents
+* domain-specific workers
 
 ---
 
 ## 11. Positioning
 
-Whitebox can be seen as a “blaze agent” core:
+Whitebox is a “blaze agent” core for OrcAI:
 
 * fast
-* predictable
 * minimal
 * controllable
+* cheap to run
 
-It trades autonomy for control and efficiency.
+It is designed for execution, not autonomy.
 
 ---
 
@@ -241,6 +263,9 @@ go run .
 
 ## Philosophy
 
+* execution over reasoning
 * control over automation
 * explicit over implicit
 * simple over complex
+
+

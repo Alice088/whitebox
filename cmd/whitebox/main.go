@@ -41,12 +41,9 @@ func main() {
 			return
 		}
 
-		// фильтр по типу
 		if t.Type != config.Agent.Type {
 			return
 		}
-
-		// --- подготовка окружения ---
 
 		session := syscontext.NewSession(t.TaskID, config.Session)
 		if err := session.CreateSessionDir(); err != nil {
@@ -79,10 +76,7 @@ func main() {
 			},
 		}
 
-		// --- выполнение ---
-
 		answer, err := engine.Run(t.Payload.Msg, func(event core.Event) {
-			// лог → task.logs.<task_id>
 			raw, _ := json.Marshal(event)
 			nc.Publish("task.logs."+t.TaskID, raw)
 		})
@@ -92,7 +86,6 @@ func main() {
 			return
 		}
 
-		// результат
 		res := task.Result{
 			TaskID: t.TaskID,
 			Result: answer,
