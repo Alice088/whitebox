@@ -6,6 +6,7 @@ const (
 	Idle     State = "idle"
 	DoOne    State = "do_one"
 	DoSecond State = "do_second"
+	Done     State = "done"
 	Final    State = "final"
 	Fail     State = "fail"
 )
@@ -28,7 +29,7 @@ func New(maxSteps int) Machine {
 }
 
 func (m *Machine) Working() bool {
-	return m.State != Final && m.State != Fail
+	return m.State != Done && m.State != Fail
 }
 
 func (m *Machine) Next() {

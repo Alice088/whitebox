@@ -77,7 +77,22 @@ func main() {
 		}
 
 		answer, err := engine.Run(t.Payload.Msg, func(event core.Event) {
-			raw, _ := json.Marshal(event)
+			logger.Info().Any("event", event).Msg("Event")
+			var raw []byte
+			if data, ok := event.Data.(string); !ok {
+				raw, _ = json.Marshal(task.Log{
+					TaskID:  t.TaskID,
+					Message: "unsupported data",
+					Level:   event.Type,
+				})
+			} else {
+				raw, _ = json.Marshal(task.Log{
+					TaskID:  t.TaskID,
+					Message: data,
+					Level:   event.Type,
+				})
+			}
+
 			nc.Publish("task.logs."+t.TaskID, raw)
 		})
 

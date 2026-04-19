@@ -79,7 +79,8 @@ func (e *Engine) Run(input string, emit func(Event)) (string, error) {
 			}
 
 		case fsm.Final:
-			emit(Event{"final", m.Memory.LastResult})
+			emit(Event{"final", "ANSWER: " + m.Memory.LastResult})
+			m.State = fsm.Done
 			return m.Memory.LastResult, nil
 		}
 	}
