@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"whitebox/internal/config"
 	"whitebox/internal/paths"
+	"whitebox/pkg/cfg"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -23,7 +23,7 @@ type Message struct {
 	Content string `json:"content"`
 }
 
-func NewSession(ID string, config config.Session) Session {
+func NewSession(ID string, config cfg.Session) Session {
 	s := Session{
 		MaxMessages: config.MaxMessages,
 	}

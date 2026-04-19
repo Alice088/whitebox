@@ -1,12 +1,20 @@
-package config
-
-const AgentName = "core"
+package cfg
 
 type Config struct {
 	LLM           LLM
 	Observability Observability
 	Session       Session
 	CallChain     CallChain
+	NATS          NATS
+	Agent         Agent
+}
+
+type NATS struct {
+	URL string `env:"NATS_URL,required"`
+}
+
+type Agent struct {
+	Type string `env:"AGENT_TYPE,required"`
 }
 
 type LLM struct {

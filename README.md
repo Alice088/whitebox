@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./static/whitebox.jpg" alt="Whitebox" />
+  <img src="./static/whitebox.png" alt="Whitebox" />
 </div>
 
 ---

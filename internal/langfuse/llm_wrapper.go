@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"time"
-	"whitebox/internal/config"
 	"whitebox/internal/core/llm"
 	"whitebox/internal/core/tools"
 	"whitebox/pkg/maps"
+	"whitebox/pkg/meta"
 
 	"github.com/henomis/langfuse-go"
 	"github.com/henomis/langfuse-go/model"
@@ -40,7 +40,7 @@ func (w *LLMWrapper) StartTrace(originInput string) error {
 	}
 
 	trace, err := w.Langfuse.Trace(&model.Trace{
-		Name:      fmt.Sprintf("whitebox-%s-request", config.AgentName),
+		Name:      fmt.Sprintf("whitebox-%s-request", meta.AgentName),
 		Input:     originInput,
 		Timestamp: new(time.Now()),
 	})
